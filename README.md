@@ -1,6 +1,6 @@
 # MacroStudio
 
-A WPF desktop automation application built using .NET 8 with hexagonal architecture principles. The system enables users to record, edit, manage, and execute automation scripts while maintaining strict safety controls and comprehensive logging.
+A WPF desktop automation application built using .NET 10 with hexagonal architecture principles. The system enables users to record, edit, manage, and execute automation scripts while maintaining strict safety controls and comprehensive logging.
 
 ## Architecture
 
@@ -39,7 +39,7 @@ MacroStudio/
 
 ### Technology Stack
 
-- **.NET 8**: Target framework
+- **.NET 10**: Target framework
 - **WPF**: User interface framework
 - **CommunityToolkit.Mvvm**: MVVM framework for data binding and commands
 - **Microsoft.Extensions.DependencyInjection**: Dependency injection container
@@ -59,10 +59,30 @@ MacroStudio/
 
 ### Prerequisites
 
-- .NET 8 SDK
+- .NET 10 SDK
 - Windows 10/11 (for WPF and Win32 API support)
 
 ### Building the Solution
+
+#### Quick Development Build (Fastest)
+
+For rapid development iterations, use the provided batch scripts:
+
+```bash
+# Fast Debug build (recommended for development)
+build-dev.bat
+
+# Build and run in Debug mode
+run-dev.bat
+
+# Release build (faster than publish, still optimized)
+build-release.bat
+
+# Full publish (slowest, for final distribution)
+publish-macrostudio.bat
+```
+
+#### Manual Build Commands
 
 ```bash
 # Clone the repository
@@ -79,6 +99,15 @@ dotnet test
 # Run the application
 dotnet run --project src/MacroStudio.Presentation
 ```
+
+#### Build Script Comparison
+
+| Script | Mode | Speed | Use Case |
+|--------|------|-------|----------|
+| `build-dev.bat` | Debug | ⚡ Fastest | Daily development |
+| `run-dev.bat` | Debug | ⚡ Fastest | Quick testing |
+| `build-release.bat` | Release | ⚡⚡ Fast | Testing optimized builds |
+| `publish-macrostudio.bat` | Release + Package | ⚡⚡⚡ Slowest | Final distribution |
 
 ### Project Dependencies
 
