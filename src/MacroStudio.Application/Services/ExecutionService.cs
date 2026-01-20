@@ -575,6 +575,9 @@ public sealed class ExecutionService : IExecutionService, IDisposable
                 case MouseClickCommand mc:
                     await _inputSimulator.SimulateMouseClickAsync(mc.Button, mc.Type);
                     break;
+                case KeyPressCommand kp:
+                    await _inputSimulator.SimulateKeyPressAsync(kp.Key, kp.IsDown);
+                    break;
                 case KeyboardCommand kc:
                     if (!string.IsNullOrEmpty(kc.Text))
                         await _inputSimulator.SimulateKeyboardInputAsync(kc.Text);

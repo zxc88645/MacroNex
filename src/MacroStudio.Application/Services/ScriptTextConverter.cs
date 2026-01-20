@@ -48,9 +48,9 @@ public static class ScriptTextConverter
                     sb.AppendLine($"type_text('{EscapeSingleQuotes(keyboard.Text)}')");
                     break;
 
-                case KeyboardCommand keyboard when keyboard.Keys.Count == 1:
-                    var keyName = ToKeyCharName(keyboard.Keys[0]);
-                    sb.AppendLine($"key_down('{keyName}')  # key command");
+                case KeyPressCommand kp:
+                    var keyName = ToKeyCharName(kp.Key);
+                    sb.AppendLine($"{(kp.IsDown ? "key_down" : "key_release")}('{keyName}')");
                     break;
 
                 case KeyboardCommand keyboard:
@@ -128,14 +128,10 @@ public static class ScriptTextConverter
                 else if (codePart.StartsWith("key_down", StringComparison.OrdinalIgnoreCase) ||
                          codePart.StartsWith("key_release", StringComparison.OrdinalIgnoreCase))
                 {
-                    // For now, interpret key_down/key_release as a simple key press (down+up).
-                    var keyChar = ParseSingleStringArg(codePart,
-                        codePart.StartsWith("key_down", StringComparison.OrdinalIgnoreCase)
-                            ? "key_down"
-                            : "key_release");
-
+                    var isDown = codePart.StartsWith("key_down", StringComparison.OrdinalIgnoreCase);
+                    var keyChar = ParseSingleStringArg(codePart, isDown ? "key_down" : "key_release");
                     var vk = ParseVirtualKeyFromChar(keyChar);
-                    commands.Add(new KeyboardCommand(vk));
+                    commands.Add(new KeyPressCommand(vk, isDown));
                 }
                 else
                 {

@@ -13,21 +13,31 @@ namespace MacroStudio.Application.Services;
 public class RecordingService : IRecordingService
 {
     private readonly IGlobalHotkeyService _hotkeyService;
+    private readonly IInputHookService _inputHookService;
+    private readonly ISettingsService _settingsService;
     private readonly ILogger<RecordingService> _logger;
     private readonly object _stateLock = new();
     
     private RecordingSession? _currentSession;
     private DateTime _lastEventTime;
     private Point _lastMousePosition;
+    private bool _hooksSubscribed;
+    private HotkeyDefinition? _ignoreStart;
+    private HotkeyDefinition? _ignorePause;
+    private HotkeyDefinition? _ignoreStop;
 
     /// <summary>
     /// Initializes a new instance of the RecordingService class.
     /// </summary>
     /// <param name="hotkeyService">Global hotkey service for recording control.</param>
+    /// <param name="inputHookService">Global input hook service for capturing mouse and keyboard events.</param>
+    /// <param name="settingsService">Settings service for reading recording hotkey configuration (to avoid recording control keys).</param>
     /// <param name="logger">Logger for diagnostic information.</param>
-    public RecordingService(IGlobalHotkeyService hotkeyService, ILogger<RecordingService> logger)
+    public RecordingService(IGlobalHotkeyService hotkeyService, IInputHookService inputHookService, ISettingsService settingsService, ILogger<RecordingService> logger)
     {
         _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
+        _inputHookService = inputHookService ?? throw new ArgumentNullException(nameof(inputHookService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         
         _logger.LogDebug("RecordingService initialized");
@@ -84,6 +94,29 @@ public class RecordingService : IRecordingService
             var recordingOptions = options ?? RecordingOptions.Default();
             var previousState = _currentSession?.State ?? RecordingState.Inactive;
 
+            // Load current recording-control hotkeys so we can ignore them during capture.
+            try
+            {
+                var settings = await _settingsService.LoadAsync();
+                settings.EnsureDefaults();
+                _ignoreStart = settings.RecordingStartHotkey;
+                _ignorePause = settings.RecordingPauseHotkey;
+                _ignoreStop = settings.RecordingStopHotkey;
+            }
+            catch
+            {
+                // Best effort; if settings cannot be loaded we just won't ignore.
+                _ignoreStart = _ignorePause = _ignoreStop = null;
+            }
+
+            // Validate recording setup BEFORE creating a session (otherwise IsRecording becomes true).
+            var validationResult = await ValidateRecordingSetupAsync();
+            if (!validationResult.IsValid)
+            {
+                var errors = string.Join("; ", validationResult.Errors);
+                throw new InvalidOperationException($"Recording setup validation failed: {errors}");
+            }
+
             // Create new recording session
             var session = new RecordingSession(recordingOptions);
             
@@ -93,18 +126,9 @@ public class RecordingService : IRecordingService
                 _lastEventTime = DateTime.UtcNow;
             }
 
-            // Validate recording setup
-            var validationResult = await ValidateRecordingSetupAsync();
-            if (!validationResult.IsValid)
-            {
-                var errors = string.Join("; ", validationResult.Errors);
-                throw new InvalidOperationException($"Recording setup validation failed: {errors}");
-            }
-
-            // TODO: Install Win32 hooks for mouse and keyboard events
-            // This requires SetWindowsHookEx API integration
-            // For now, we'll set up the session but hooks need to be implemented
-            _logger.LogWarning("Win32 hooks not yet implemented. Recording session created but events will not be captured.");
+            // Install Win32 hooks for mouse and keyboard events
+            EnsureHookSubscriptions();
+            await _inputHookService.InstallHooksAsync(recordingOptions);
 
             // Raise state changed event
             RaiseStateChanged(previousState, RecordingState.Active, session.Id, "Recording started");
@@ -128,9 +152,9 @@ public class RecordingService : IRecordingService
         lock (_stateLock)
         {
             session = _currentSession;
-            if (session == null || session.State != RecordingState.Active)
+            if (session == null || (session.State != RecordingState.Active && session.State != RecordingState.Paused))
             {
-                throw new InvalidOperationException("No active recording session to stop.");
+                throw new InvalidOperationException("No active or paused recording session to stop.");
             }
 
             previousState = session.State;
@@ -140,8 +164,15 @@ public class RecordingService : IRecordingService
         {
             _logger.LogInformation("Stopping recording session {SessionId}", session.Id);
 
-            // TODO: Uninstall Win32 hooks
-            _logger.LogDebug("Uninstalling Win32 hooks");
+            // Uninstall hooks (best effort)
+            try
+            {
+                await _inputHookService.UninstallHooksAsync();
+            }
+            catch (Exception hookEx)
+            {
+                _logger.LogWarning(hookEx, "Failed to uninstall input hooks");
+            }
 
             // Change state to stopped
             session.ChangeState(RecordingState.Stopped);
@@ -164,6 +195,81 @@ public class RecordingService : IRecordingService
             _logger.LogError(ex, "Error stopping recording session {SessionId}", session.Id);
             RaiseError(ex, "Stopping recording", session.Id);
             throw;
+        }
+    }
+
+    private void EnsureHookSubscriptions()
+    {
+        if (_hooksSubscribed)
+            return;
+
+        _inputHookService.MouseMoved += OnMouseMoved;
+        _inputHookService.MouseClicked += OnMouseClicked;
+        _inputHookService.KeyboardInput += OnKeyboardInput;
+        _hooksSubscribed = true;
+    }
+
+    private void OnMouseMoved(object? sender, InputHookMouseMoveEventArgs e)
+    {
+        HandleMouseMove(e.Position);
+    }
+
+    private void OnMouseClicked(object? sender, InputHookMouseClickEventArgs e)
+    {
+        HandleMouseClick(e.Position, e.Button, e.ClickType);
+    }
+
+    private void OnKeyboardInput(object? sender, InputHookKeyEventArgs e)
+    {
+        HandleKeyPress(e.Key, e.IsDown);
+    }
+
+    internal void HandleKeyPress(VirtualKey key, bool isDown)
+    {
+        RecordingSession? session;
+
+        lock (_stateLock)
+        {
+            session = _currentSession;
+            if (session == null || session.State != RecordingState.Active)
+                return;
+
+            if (!session.Options.RecordKeyboardInput)
+                return;
+        }
+
+        try
+        {
+            // Do not record recording-control hotkeys (Start/Pause/Stop).
+            // We ignore both down/up to keep scripts clean.
+            // NOTE: we only get VirtualKey here (no modifier state), so we ignore by Key.
+            bool MatchesIgnore(HotkeyDefinition? hk) => hk != null && hk.Key == key;
+            if (MatchesIgnore(_ignoreStart) || MatchesIgnore(_ignorePause) || MatchesIgnore(_ignoreStop))
+                return;
+
+            var now = DateTime.UtcNow;
+            var delay = now - _lastEventTime;
+
+            if (delay < session.Options.MinimumDelay)
+                delay = session.Options.MinimumDelay;
+
+            if (delay > session.Options.MaximumDelay)
+                delay = session.Options.MaximumDelay;
+
+            var command = new KeyPressCommand(key, isDown)
+            {
+                Delay = delay
+            };
+
+            session.AddCommand(command);
+            _lastEventTime = now;
+
+            RaiseCommandRecorded(command, session.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling key press event");
+            RaiseError(ex, "Handling key press", session.Id);
         }
     }
 
@@ -310,12 +416,6 @@ public class RecordingService : IRecordingService
 
             // TODO: Check if Win32 hooks can be installed
             // This would check system permissions and hook availability
-
-            // Check if recording is already active
-            if (IsRecording)
-            {
-                errors.Add("Recording is already active. Stop the current session before starting a new one.");
-            }
         }
         catch (Exception ex)
         {
