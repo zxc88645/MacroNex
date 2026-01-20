@@ -20,12 +20,21 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
     private readonly object _lockObject = new();
     private readonly ConcurrentDictionary<int, HotkeyDefinition> _registeredHotkeys = new();
     private readonly ConcurrentDictionary<HotkeyDefinition, int> _hotkeyIds = new();
+    private readonly ConcurrentDictionary<int, HotkeyRegistrationInfo> _pendingRegistrations = new();
     
     private Thread? _messageLoopThread;
     private volatile bool _isRunning = false;
     private volatile bool _isDisposed = false;
     private int _nextHotkeyId = 1;
     private uint _threadId;
+
+    private class HotkeyRegistrationInfo
+    {
+        public int HotkeyId { get; set; }
+        public uint Modifiers { get; set; }
+        public uint VirtualKey { get; set; }
+        public HotkeyDefinition Hotkey { get; set; } = null!;
+    }
 
     /// <inheritdoc />
     public event EventHandler<HotkeyPressedEventArgs>? HotkeyPressed;
@@ -62,6 +71,25 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         }
 
         _logger.LogDebug("Registering hotkey: {Hotkey}", hotkey);
+        
+        // Wait for message loop thread to be ready
+        var maxWaitTime = TimeSpan.FromSeconds(5);
+        var startTime = DateTime.UtcNow;
+        while (_threadId == 0 && DateTime.UtcNow - startTime < maxWaitTime)
+        {
+            await Task.Delay(10);
+        }
+
+        if (_threadId == 0)
+        {
+            throw new HotkeyRegistrationException(
+                "Message loop thread is not ready",
+                hotkey);
+        }
+
+        int hotkeyId;
+        HotkeyRegistrationInfo registrationInfo;
+
         lock (_lockObject)
         {
             // Check if hotkey is already registered
@@ -82,36 +110,55 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
                     hotkey);
             }
 
-            var hotkeyId = GetNextHotkeyId();
+            hotkeyId = GetNextHotkeyId();
             var modifiers = hotkey.Modifiers.ToWin32Modifiers() | MOD_NOREPEAT;
             var virtualKey = (uint)hotkey.Key;
 
-            // Register the hotkey with Win32
-            if (!_api.RegisterHotKey(IntPtr.Zero, hotkeyId, modifiers, virtualKey))
+            registrationInfo = new HotkeyRegistrationInfo
             {
+                HotkeyId = hotkeyId,
+                Modifiers = modifiers,
+                VirtualKey = virtualKey,
+                Hotkey = hotkey
+            };
+
+            // Store pending registration before posting message
+            _pendingRegistrations[hotkeyId] = registrationInfo;
+
+            // Post a custom message to the message loop thread to register the hotkey
+            if (!_api.PostThreadMessage(_threadId, WM_HOTKEY_REGISTER, (IntPtr)hotkeyId, IntPtr.Zero))
+            {
+                _pendingRegistrations.TryRemove(hotkeyId, out _);
                 var error = _api.GetLastError();
-                _logger.LogError("Failed to register hotkey {Hotkey}. Win32 error: {Error}", hotkey, error);
-
-                var errorMessage = error switch
-                {
-                    ERROR_HOTKEY_ALREADY_REGISTERED => "Hotkey is already registered by another application",
-                    _ => $"Win32 error {error}"
-                };
-
+                _logger.LogError("Failed to post registration message for hotkey {Hotkey}. Win32 error: {Error}", hotkey, error);
                 throw new HotkeyRegistrationException(
-                    $"Failed to register hotkey {hotkey}: {errorMessage}",
+                    $"Failed to register hotkey {hotkey}: Could not post registration message",
                     hotkey,
                     (int)error);
             }
-
-            // Store the registration
-            _registeredHotkeys[hotkeyId] = hotkey;
-            _hotkeyIds[hotkey] = hotkeyId;
-
-            _logger.LogDebug("Successfully registered hotkey {Hotkey} with ID {HotkeyId}", hotkey, hotkeyId);
         }
 
-        await Task.CompletedTask;
+        // Wait for registration to complete (with timeout)
+        var registrationTimeout = TimeSpan.FromSeconds(2);
+        var registrationStart = DateTime.UtcNow;
+        while (!_registeredHotkeys.ContainsKey(hotkeyId) && 
+               DateTime.UtcNow - registrationStart < registrationTimeout)
+        {
+            await Task.Delay(10);
+        }
+
+        if (!_registeredHotkeys.ContainsKey(hotkeyId))
+        {
+            lock (_lockObject)
+            {
+                _pendingRegistrations.TryRemove(hotkeyId, out _);
+            }
+            throw new HotkeyRegistrationException(
+                "Hotkey registration timed out",
+                hotkey);
+        }
+
+        _logger.LogDebug("Successfully registered hotkey {Hotkey} with ID {HotkeyId}", hotkey, hotkeyId);
     }
 
     /// <inheritdoc />
@@ -287,6 +334,10 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
                     {
                         HandleHotkeyMessage(msg);
                     }
+                    else if (msg.message == WM_HOTKEY_REGISTER)
+                    {
+                        HandleHotkeyRegistrationMessage(msg);
+                    }
                     else
                     {
                         // Process other messages normally
@@ -308,6 +359,54 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         finally
         {
             _logger.LogDebug("Message loop thread exiting");
+        }
+    }
+
+    /// <summary>
+    /// Handles WM_HOTKEY_REGISTER messages to register hotkeys on the message loop thread.
+    /// </summary>
+    /// <param name="msg">The registration message.</param>
+    private void HandleHotkeyRegistrationMessage(MSG msg)
+    {
+        try
+        {
+            var hotkeyId = (int)msg.wParam;
+            
+            if (_pendingRegistrations.TryRemove(hotkeyId, out var registrationInfo))
+            {
+                // Register the hotkey with Win32 on this thread
+                if (!_api.RegisterHotKey(IntPtr.Zero, registrationInfo.HotkeyId, registrationInfo.Modifiers, registrationInfo.VirtualKey))
+                {
+                    var error = _api.GetLastError();
+                    _logger.LogError("Failed to register hotkey {Hotkey} on message loop thread. Win32 error: {Error}", registrationInfo.Hotkey, error);
+
+                    var errorMessage = error switch
+                    {
+                        ERROR_HOTKEY_ALREADY_REGISTERED => "Hotkey is already registered by another application",
+                        _ => $"Win32 error {error}"
+                    };
+
+                    _logger.LogError("Hotkey registration failed: {ErrorMessage}", errorMessage);
+                    return;
+                }
+
+                // Store the registration
+                lock (_lockObject)
+                {
+                    _registeredHotkeys[registrationInfo.HotkeyId] = registrationInfo.Hotkey;
+                    _hotkeyIds[registrationInfo.Hotkey] = registrationInfo.HotkeyId;
+                }
+
+                _logger.LogDebug("Successfully registered hotkey {Hotkey} with ID {HotkeyId} on message loop thread", registrationInfo.Hotkey, registrationInfo.HotkeyId);
+            }
+            else
+            {
+                _logger.LogWarning("Received registration message for unknown hotkey ID {HotkeyId}", hotkeyId);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling hotkey registration message");
         }
     }
 
