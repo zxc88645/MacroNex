@@ -21,6 +21,7 @@ public partial class CommandGridViewModel : ObservableObject
     private readonly ILoggingService _loggingService;
     private readonly IInputSimulator _inputSimulator;
     private bool _isUpdatingDocument;
+    private string _originalScriptText = string.Empty;
 
     public ObservableCollection<Command> Commands { get; } = new();
 
@@ -29,6 +30,9 @@ public partial class CommandGridViewModel : ObservableObject
 
     [ObservableProperty]
     private Script? currentScript;
+
+    [ObservableProperty]
+    private bool hasUnsavedChanges;
 
     /// <summary>
     /// Gets the AvalonEdit document for the script text.
@@ -60,7 +64,10 @@ public partial class CommandGridViewModel : ObservableObject
         {
             _isUpdatingDocument = true;
             Document.Text = string.Empty;
+            _originalScriptText = string.Empty;
+            HasUnsavedChanges = false;
             _isUpdatingDocument = false;
+            ApplyScriptTextCommand.NotifyCanExecuteChanged();
             return;
         }
         
@@ -70,7 +77,10 @@ public partial class CommandGridViewModel : ObservableObject
         var text = ScriptTextConverter.ToText(script);
         _isUpdatingDocument = true;
         Document.Text = text;
+        _originalScriptText = text;
+        HasUnsavedChanges = false;
         _isUpdatingDocument = false;
+        ApplyScriptTextCommand.NotifyCanExecuteChanged();
     }
 
     private void OnDocumentTextChanged(object? sender, EventArgs e)
@@ -78,6 +88,10 @@ public partial class CommandGridViewModel : ObservableObject
         if (_isUpdatingDocument) return;
         
         ScriptText = Document.Text;
+        
+        // Check if text has changed from original
+        HasUnsavedChanges = CurrentScript != null && Document.Text != _originalScriptText;
+        ApplyScriptTextCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(HasScript))]
@@ -120,8 +134,31 @@ public partial class CommandGridViewModel : ObservableObject
         if (dlg.ShowDialog() != true)
             return;
 
-        var text = dlg.ValueText ?? string.Empty;
-        CurrentScript.AddCommand(new KeyboardCommand(text));
+        var text = dlg.ValueText?.Trim() ?? string.Empty;
+        
+        // Validate that text is not empty
+        if (string.IsNullOrEmpty(text))
+        {
+            await _loggingService.LogWarningAsync("Cannot add empty keyboard text command", new Dictionary<string, object>
+            {
+                { "ScriptId", CurrentScript.Id },
+                { "ScriptName", CurrentScript.Name }
+            });
+            return;
+        }
+
+        var command = new KeyboardCommand(text);
+        if (!command.IsValid())
+        {
+            await _loggingService.LogWarningAsync("Invalid keyboard command created", new Dictionary<string, object>
+            {
+                { "ScriptId", CurrentScript.Id },
+                { "ScriptName", CurrentScript.Name }
+            });
+            return;
+        }
+
+        CurrentScript.AddCommand(command);
         await PersistAndReloadAsync("Added keyboard text command");
     }
 
@@ -164,7 +201,7 @@ public partial class CommandGridViewModel : ObservableObject
         await PersistAndReloadAsync("Removed last command");
     }
 
-    [RelayCommand(CanExecute = nameof(HasScript))]
+    [RelayCommand(CanExecute = nameof(CanApplyScript))]
     private async Task ApplyScriptTextAsync()
     {
         if (CurrentScript == null) return;
@@ -193,6 +230,8 @@ public partial class CommandGridViewModel : ObservableObject
     }
 
     private bool HasScript() => CurrentScript != null;
+    
+    private bool CanApplyScript() => CurrentScript != null && HasUnsavedChanges;
 
     private async Task<bool> TryApplyScriptTextInternalAsync()
     {
@@ -266,6 +305,7 @@ public partial class CommandGridViewModel : ObservableObject
         AddLeftClickCommand.NotifyCanExecuteChanged();
         AddRightClickCommand.NotifyCanExecuteChanged();
         AddMiddleClickCommand.NotifyCanExecuteChanged();
+        ApplyScriptTextCommand.NotifyCanExecuteChanged();
     }
 
     private async Task AddClickSequenceAsync(MouseButton button)

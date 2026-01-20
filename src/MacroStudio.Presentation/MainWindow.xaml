@@ -8,7 +8,7 @@
         xmlns:views="clr-namespace:MacroStudio.Presentation.Views"
         xmlns:conv="clr-namespace:MacroStudio.Presentation.Converters"
         mc:Ignorable="d"
-        Title="Macro Studio" Height="720" Width="1200"
+        Title="Macro Studio" Height="900" Width="1600"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource Bg0}">
     <Grid>
@@ -116,7 +116,7 @@
                              ToolTip="Max results"/>
                 </DockPanel>
 
-                <ListBox ItemsSource="{Binding Logging.Entries}" BorderThickness="0">
+                <ListBox x:Name="LogsListBox" ItemsSource="{Binding Logging.Entries}" BorderThickness="0">
                     <ListBox.ItemTemplate>
                         <DataTemplate>
                             <DockPanel Margin="0,2">

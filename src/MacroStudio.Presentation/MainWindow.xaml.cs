@@ -1,14 +1,6 @@
-﻿using System.Text;
+﻿using System.Collections.Specialized;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Data;
-using System.Windows.Documents;
-using System.Windows.Input;
-using System.Windows.Media;
-using System.Windows.Media.Imaging;
-using System.Windows.Navigation;
-using System.Windows.Shapes;
-
 using MacroStudio.Presentation.ViewModels;
 
 namespace MacroStudio.Presentation;
@@ -22,5 +14,25 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = mainViewModel ?? throw new ArgumentNullException(nameof(mainViewModel));
+        
+        // Subscribe to log entries collection changes to auto-scroll
+        if (mainViewModel.Logging?.Entries is INotifyCollectionChanged notifyCollection)
+        {
+            notifyCollection.CollectionChanged += OnLogEntriesCollectionChanged;
+        }
+    }
+
+    private void OnLogEntriesCollectionChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        // Auto-scroll to bottom when new items are added
+        if (e.Action == NotifyCollectionChangedAction.Add && LogsListBox.Items.Count > 0)
+        {
+            // Use Dispatcher to ensure UI thread execution
+            Dispatcher.BeginInvoke(() =>
+            {
+                var lastItem = LogsListBox.Items[LogsListBox.Items.Count - 1];
+                LogsListBox.ScrollIntoView(lastItem);
+            }, System.Windows.Threading.DispatcherPriority.Loaded);
+        }
     }
 }
