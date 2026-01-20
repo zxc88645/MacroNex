@@ -63,17 +63,12 @@ public sealed class ExecutionService : IExecutionService, IDisposable
         }
     }
 
-    private readonly HotkeyDefinition _killSwitchHotkey =
-        HotkeyDefinition.Create("Kill Switch", HotkeyModifiers.Control | HotkeyModifiers.Shift, VirtualKey.VK_ESCAPE);
-
     public ExecutionService(IInputSimulator inputSimulator, IGlobalHotkeyService globalHotkeyService, ISafetyService safetyService, ILogger<ExecutionService> logger)
     {
         _inputSimulator = inputSimulator ?? throw new ArgumentNullException(nameof(inputSimulator));
         _globalHotkeyService = globalHotkeyService ?? throw new ArgumentNullException(nameof(globalHotkeyService));
         _safetyService = safetyService ?? throw new ArgumentNullException(nameof(safetyService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-
-        _globalHotkeyService.HotkeyPressed += OnHotkeyPressed;
     }
 
     public ExecutionState State
@@ -164,22 +159,6 @@ public sealed class ExecutionService : IExecutionService, IDisposable
             State = ExecutionState.Running;
         }
 
-        // Register kill switch hotkey (best-effort, fire and forget to avoid delay)
-        // Don't await to avoid blocking execution start
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                if (await _globalHotkeyService.IsReadyAsync())
-                {
-                    await _globalHotkeyService.RegisterHotkeyAsync(_killSwitchHotkey);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogWarning(ex, "Failed to register kill switch hotkey");
-            }
-        });
 
         RaiseStateChanged(ExecutionState.Idle, ExecutionState.Running, session.Id, "Execution started");
 
@@ -563,18 +542,6 @@ public sealed class ExecutionService : IExecutionService, IDisposable
 
             // 清理資源
             context.Dispose();
-
-            // Unregister kill switch hotkey best-effort (僅當沒有其他執行時)
-            lock (_lockObject)
-            {
-                if (_activeExecutions.Count == 0)
-                {
-                    _ = Task.Run(async () =>
-                    {
-                        try { await _globalHotkeyService.UnregisterHotkeyAsync(_killSwitchHotkey); } catch { }
-                    });
-                }
-            }
         }
     }
 
@@ -722,24 +689,7 @@ public sealed class ExecutionService : IExecutionService, IDisposable
 
         try { _cts?.Cancel(); } catch { }
         try { _pauseEvent.Set(); } catch { }
-        try { _globalHotkeyService.HotkeyPressed -= OnHotkeyPressed; } catch { }
         _pauseEvent.Dispose();
-    }
-
-    private void OnHotkeyPressed(object? sender, HotkeyPressedEventArgs e)
-    {
-        try
-        {
-            if (e.Hotkey.Modifiers == _killSwitchHotkey.Modifiers && e.Hotkey.Key == _killSwitchHotkey.Key)
-            {
-                _ = _safetyService.ActivateKillSwitchAsync("Kill switch hotkey pressed");
-                _ = TerminateExecutionAsync();
-            }
-        }
-        catch
-        {
-            // never throw from event handler
-        }
     }
 }
 
