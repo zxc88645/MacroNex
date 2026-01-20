@@ -306,7 +306,14 @@ public class JsonFileStorageService : IFileStorageService
             Name = script.Name,
             CreatedAt = script.CreatedAt,
             ModifiedAt = script.ModifiedAt,
-            Commands = script.Commands.Select(ConvertToCommandDto).ToList()
+            Commands = script.Commands.Select(ConvertToCommandDto).ToList(),
+            TriggerHotkey = script.TriggerHotkey != null ? new HotkeyDto
+            {
+                Id = script.TriggerHotkey.Id,
+                Name = script.TriggerHotkey.Name,
+                Modifiers = script.TriggerHotkey.Modifiers.ToString(),
+                Key = script.TriggerHotkey.Key.ToString()
+            } : null
         };
     }
 
@@ -380,12 +387,33 @@ public class JsonFileStorageService : IFileStorageService
     {
         var commands = dto.Commands.Select(ConvertToCommand).ToList();
         
+        HotkeyDefinition? triggerHotkey = null;
+        if (dto.TriggerHotkey != null)
+        {
+            try
+            {
+                var modifiers = Enum.Parse<HotkeyModifiers>(dto.TriggerHotkey.Modifiers);
+                var key = Enum.Parse<VirtualKey>(dto.TriggerHotkey.Key);
+                triggerHotkey = new HotkeyDefinition(
+                    dto.TriggerHotkey.Id,
+                    dto.TriggerHotkey.Name,
+                    modifiers,
+                    key
+                );
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to parse trigger hotkey for script {ScriptId}", dto.Id);
+            }
+        }
+        
         return new Script(
             dto.Id,
             dto.Name,
             commands,
             dto.CreatedAt,
-            dto.ModifiedAt
+            dto.ModifiedAt,
+            triggerHotkey
         );
     }
 
@@ -519,6 +547,18 @@ public class JsonFileStorageService : IFileStorageService
         public DateTime CreatedAt { get; set; }
         public DateTime ModifiedAt { get; set; }
         public List<CommandDto> Commands { get; set; } = new();
+        public HotkeyDto? TriggerHotkey { get; set; }
+    }
+
+    /// <summary>
+    /// Data transfer object for HotkeyDefinition serialization.
+    /// </summary>
+    private class HotkeyDto
+    {
+        public Guid Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Modifiers { get; set; } = string.Empty;
+        public string Key { get; set; } = string.Empty;
     }
 
     /// <summary>
