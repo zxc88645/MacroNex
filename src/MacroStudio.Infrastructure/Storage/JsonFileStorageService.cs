@@ -312,7 +312,8 @@ public class JsonFileStorageService : IFileStorageService
                 Id = script.TriggerHotkey.Id,
                 Name = script.TriggerHotkey.Name,
                 Modifiers = script.TriggerHotkey.Modifiers.ToString(),
-                Key = script.TriggerHotkey.Key.ToString()
+                Key = script.TriggerHotkey.Key.ToString(),
+                TriggerMode = script.TriggerHotkey.TriggerMode.ToString()
             } : null
         };
     }
@@ -394,11 +395,21 @@ public class JsonFileStorageService : IFileStorageService
             {
                 var modifiers = Enum.Parse<HotkeyModifiers>(dto.TriggerHotkey.Modifiers);
                 var key = Enum.Parse<VirtualKey>(dto.TriggerHotkey.Key);
+                // Parse TriggerMode, default to Once if not present (for backward compatibility)
+                var triggerMode = HotkeyTriggerMode.Once;
+                if (!string.IsNullOrEmpty(dto.TriggerHotkey.TriggerMode))
+                {
+                    if (Enum.TryParse<HotkeyTriggerMode>(dto.TriggerHotkey.TriggerMode, out var parsedMode))
+                    {
+                        triggerMode = parsedMode;
+                    }
+                }
                 triggerHotkey = new HotkeyDefinition(
                     dto.TriggerHotkey.Id,
                     dto.TriggerHotkey.Name,
                     modifiers,
-                    key
+                    key,
+                    triggerMode
                 );
             }
             catch (Exception ex)
@@ -559,6 +570,7 @@ public class JsonFileStorageService : IFileStorageService
         public string Name { get; set; } = string.Empty;
         public string Modifiers { get; set; } = string.Empty;
         public string Key { get; set; } = string.Empty;
+        public string TriggerMode { get; set; } = HotkeyTriggerMode.Once.ToString();
     }
 
     /// <summary>

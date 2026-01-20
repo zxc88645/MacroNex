@@ -26,13 +26,19 @@ public record HotkeyDefinition
     public VirtualKey Key { get; init; }
 
     /// <summary>
+    /// The trigger mode for this hotkey (how it behaves when pressed).
+    /// </summary>
+    public HotkeyTriggerMode TriggerMode { get; init; }
+
+    /// <summary>
     /// Initializes a new instance of the HotkeyDefinition record.
     /// </summary>
     /// <param name="id">The unique identifier for this hotkey.</param>
     /// <param name="name">The name or description of this hotkey.</param>
     /// <param name="modifiers">The modifier keys.</param>
     /// <param name="key">The main key.</param>
-    public HotkeyDefinition(Guid id, string name, HotkeyModifiers modifiers, VirtualKey key)
+    /// <param name="triggerMode">The trigger mode for this hotkey.</param>
+    public HotkeyDefinition(Guid id, string name, HotkeyModifiers modifiers, VirtualKey key, HotkeyTriggerMode triggerMode = HotkeyTriggerMode.Once)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Hotkey name cannot be null or whitespace", nameof(name));
@@ -44,6 +50,7 @@ public record HotkeyDefinition
         Name = name.Trim();
         Modifiers = modifiers;
         Key = key;
+        TriggerMode = triggerMode;
     }
 
     /// <summary>
@@ -52,10 +59,11 @@ public record HotkeyDefinition
     /// <param name="name">The name or description of this hotkey.</param>
     /// <param name="modifiers">The modifier keys.</param>
     /// <param name="key">The main key.</param>
+    /// <param name="triggerMode">The trigger mode for this hotkey.</param>
     /// <returns>A new HotkeyDefinition instance.</returns>
-    public static HotkeyDefinition Create(string name, HotkeyModifiers modifiers, VirtualKey key)
+    public static HotkeyDefinition Create(string name, HotkeyModifiers modifiers, VirtualKey key, HotkeyTriggerMode triggerMode = HotkeyTriggerMode.Once)
     {
-        return new HotkeyDefinition(Guid.NewGuid(), name, modifiers, key);
+        return new HotkeyDefinition(Guid.NewGuid(), name, modifiers, key, triggerMode);
     }
 
     /// <summary>

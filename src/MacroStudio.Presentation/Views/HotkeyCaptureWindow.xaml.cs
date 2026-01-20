@@ -10,6 +10,7 @@ public partial class HotkeyCaptureWindow : Window
     private HotkeyModifiers _currentModifiers = HotkeyModifiers.None;
     private VirtualKey? _currentKey = null;
     private bool _isCapturing = true;
+    private HotkeyTriggerMode _selectedTriggerMode = HotkeyTriggerMode.Once;
 
     public HotkeyDefinition? ResultHotkey { get; private set; }
 
@@ -21,6 +22,18 @@ public partial class HotkeyCaptureWindow : Window
         {
             _currentModifiers = existingHotkey.Modifiers;
             _currentKey = existingHotkey.Key;
+            _selectedTriggerMode = existingHotkey.TriggerMode;
+            
+            // Update radio buttons based on existing hotkey mode
+            if (_selectedTriggerMode == HotkeyTriggerMode.RepeatWhileHeld)
+            {
+                RepeatModeRadio.IsChecked = true;
+            }
+            else
+            {
+                OnceModeRadio.IsChecked = true;
+            }
+            
             UpdateDisplay();
         }
 
@@ -176,7 +189,8 @@ public partial class HotkeyCaptureWindow : Window
                 Guid.NewGuid(),
                 "Script Hotkey",
                 _currentModifiers,
-                _currentKey.Value
+                _currentKey.Value,
+                _selectedTriggerMode
             );
             
             if (hotkey.IsValid())
@@ -235,7 +249,8 @@ public partial class HotkeyCaptureWindow : Window
                 Guid.NewGuid(),
                 "Script Hotkey",
                 _currentModifiers,
-                _currentKey.Value
+                _currentKey.Value,
+                _selectedTriggerMode
             );
             
             if (ResultHotkey.IsValid())
@@ -243,6 +258,18 @@ public partial class HotkeyCaptureWindow : Window
                 DialogResult = true;
                 Close();
             }
+        }
+    }
+
+    private void TriggerModeRadio_Checked(object sender, RoutedEventArgs e)
+    {
+        if (sender == OnceModeRadio)
+        {
+            _selectedTriggerMode = HotkeyTriggerMode.Once;
+        }
+        else if (sender == RepeatModeRadio)
+        {
+            _selectedTriggerMode = HotkeyTriggerMode.RepeatWhileHeld;
         }
     }
 }

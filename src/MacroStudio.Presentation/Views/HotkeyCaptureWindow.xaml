@@ -7,7 +7,7 @@
         Background="{DynamicResource Bg0}"
         Title="設置熱鍵"
         Width="500"
-        Height="250"
+        Height="300"
         KeyDown="Window_KeyDown"
         PreviewKeyDown="Window_PreviewKeyDown"
         Focusable="True">
@@ -34,6 +34,16 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource TextBrush}"/>
             </Border>
+
+            <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
+                <TextBlock Text="觸發模式：" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <StackPanel Orientation="Horizontal">
+                    <RadioButton x:Name="OnceModeRadio" Content="僅一次" IsChecked="True" Margin="0,0,16,0" 
+                                 Checked="TriggerModeRadio_Checked"/>
+                    <RadioButton x:Name="RepeatModeRadio" Content="按住時重複" 
+                                 Checked="TriggerModeRadio_Checked"/>
+                </StackPanel>
+            </StackPanel>
 
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
                 <Button Content="清除" Width="90" Margin="0,0,10,0" Click="ClearButton_Click" />
