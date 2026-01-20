@@ -109,7 +109,7 @@ public class ExecutionServicePropertyTests
     {
         public Task SimulateMouseMoveAsync(Point position) => Task.CompletedTask;
 
-        public Task SimulateMouseClickAsync(Point position, MouseButton button, ClickType type) => Task.CompletedTask;
+        public Task SimulateMouseClickAsync(MouseButton button, ClickType type) => Task.CompletedTask;
 
         public Task SimulateKeyboardInputAsync(string text) => Task.CompletedTask;
 

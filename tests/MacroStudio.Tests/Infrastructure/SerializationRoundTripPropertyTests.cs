@@ -70,7 +70,6 @@ public class SerializationRoundTripPropertyTests
                         Guid.NewGuid(),
                         delay,
                         cmdCreatedAt,
-                        new MacroStudio.Domain.ValueObjects.Point(i + 2, i + 3),
                         MacroStudio.Domain.ValueObjects.MouseButton.Left,
                         MacroStudio.Domain.ValueObjects.ClickType.Click),
                     2 => new KeyboardCommand(Guid.NewGuid(), delay, cmdCreatedAt, $"Text{i}", Array.Empty<MacroStudio.Domain.ValueObjects.VirtualKey>()),
@@ -107,7 +106,6 @@ public class SerializationRoundTripPropertyTests
                         if (am.Position != bm.Position) return false;
                         break;
                     case MouseClickCommand am when bc is MouseClickCommand bm:
-                        if (am.Position != bm.Position) return false;
                         if (am.Button != bm.Button) return false;
                         if (am.Type != bm.Type) return false;
                         break;

@@ -45,7 +45,7 @@ public class ScriptLifecycleIntegrityPropertyTests
             var commands = new Command[]
             {
                 new MouseMoveCommand(new Point(100, 200)),
-                new MouseClickCommand(new Point(150, 250), MouseButton.Left, ClickType.Click),
+                new MouseClickCommand(MouseButton.Left, ClickType.Click),
                 new KeyboardCommand("Hello World"),
                 new SleepCommand(TimeSpan.FromMilliseconds(500))
             };
@@ -292,8 +292,8 @@ public class ScriptLifecycleIntegrityPropertyTests
             return false;
 
         // Test MouseClickCommand validation
-        var mouseClickValid = new MouseClickCommand(new Point(Math.Abs(x), Math.Abs(y)), MouseButton.Left, ClickType.Click) { Delay = delay };
-        var mouseClickInvalid = new MouseClickCommand(new Point(-1, -1), MouseButton.Left, ClickType.Click) { Delay = delay };
+        var mouseClickValid = new MouseClickCommand(MouseButton.Left, ClickType.Click) { Delay = delay };
+        var mouseClickInvalid = new MouseClickCommand((MouseButton)999, ClickType.Click) { Delay = delay };
         
         if (mouseClickValid.IsValid() != true || mouseClickInvalid.IsValid() != false)
             return false;

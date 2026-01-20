@@ -70,42 +70,26 @@ public class Win32InputSimulatorTests : IDisposable
         await Assert.ThrowsAsync<ArgumentException>(() => _inputSimulator.SimulateMouseMoveAsync(position));
     }
 
-    [Theory]
-    [InlineData(-1, 0)]
-    [InlineData(0, -1)]
-    [InlineData(-1, -1)]
-    public async Task SimulateMouseClickAsync_WithNegativeCoordinates_ThrowsArgumentException(int x, int y)
-    {
-        // Arrange
-        var position = new Point(x, y);
-
-        // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => 
-            _inputSimulator.SimulateMouseClickAsync(position, MouseButton.Left, ClickType.Click));
-    }
-
     [Fact]
     public async Task SimulateMouseClickAsync_WithInvalidMouseButton_ThrowsArgumentException()
     {
         // Arrange
-        var position = new Point(100, 100);
         var invalidButton = (MouseButton)999;
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
-            _inputSimulator.SimulateMouseClickAsync(position, invalidButton, ClickType.Click));
+            _inputSimulator.SimulateMouseClickAsync(invalidButton, ClickType.Click));
     }
 
     [Fact]
     public async Task SimulateMouseClickAsync_WithInvalidClickType_ThrowsArgumentException()
     {
         // Arrange
-        var position = new Point(100, 100);
         var invalidClickType = (ClickType)999;
 
         // Act & Assert
         await Assert.ThrowsAsync<ArgumentException>(() => 
-            _inputSimulator.SimulateMouseClickAsync(position, MouseButton.Left, invalidClickType));
+            _inputSimulator.SimulateMouseClickAsync(MouseButton.Left, invalidClickType));
     }
 
     [Fact]
@@ -229,11 +213,10 @@ public class Win32InputSimulatorTests : IDisposable
     {
         // Arrange
         _inputSimulator.Dispose();
-        var position = new Point(100, 100);
 
         // Act & Assert
         await Assert.ThrowsAsync<ObjectDisposedException>(() => 
-            _inputSimulator.SimulateMouseClickAsync(position, MouseButton.Left, ClickType.Click));
+            _inputSimulator.SimulateMouseClickAsync(MouseButton.Left, ClickType.Click));
     }
 
     [Fact]

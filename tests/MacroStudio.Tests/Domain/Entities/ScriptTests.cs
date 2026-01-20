@@ -114,7 +114,7 @@ public class ScriptTests
         // Arrange
         var script = new Script("Test Script");
         var command1 = new MouseMoveCommand(new Point(100, 200));
-        var command2 = new MouseClickCommand(new Point(150, 250), MouseButton.Left, ClickType.Click);
+        var command2 = new MouseClickCommand(MouseButton.Left, ClickType.Click);
         var command3 = new SleepCommand(TimeSpan.FromMilliseconds(500));
         
         script.AddCommand(command1);
@@ -136,7 +136,7 @@ public class ScriptTests
         // Arrange
         var script = new Script("Test Script");
         var command1 = new MouseMoveCommand(new Point(100, 200));
-        var command2 = new MouseClickCommand(new Point(150, 250), MouseButton.Left, ClickType.Click);
+        var command2 = new MouseClickCommand(MouseButton.Left, ClickType.Click);
         script.AddCommand(command1);
         script.AddCommand(command2);
 
@@ -169,7 +169,7 @@ public class ScriptTests
         // Arrange
         var script = new Script("Test Script");
         var command1 = new MouseMoveCommand(new Point(100, 200));
-        var command2 = new MouseClickCommand(new Point(150, 250), MouseButton.Left, ClickType.Click);
+        var command2 = new MouseClickCommand(MouseButton.Left, ClickType.Click);
         var command3 = new SleepCommand(TimeSpan.FromMilliseconds(500));
         
         script.AddCommand(command1);
@@ -193,7 +193,7 @@ public class ScriptTests
         var script = new Script("Test Script");
         var command1 = new MouseMoveCommand(new Point(100, 200)) { Delay = TimeSpan.FromMilliseconds(100) };
         var command2 = new SleepCommand(TimeSpan.FromMilliseconds(500)) { Delay = TimeSpan.FromMilliseconds(50) };
-        var command3 = new MouseClickCommand(new Point(150, 250), MouseButton.Left, ClickType.Click) { Delay = TimeSpan.FromMilliseconds(25) };
+        var command3 = new MouseClickCommand(MouseButton.Left, ClickType.Click) { Delay = TimeSpan.FromMilliseconds(25) };
         
         script.AddCommand(command1);
         script.AddCommand(command2);
@@ -213,7 +213,7 @@ public class ScriptTests
         // Arrange
         var originalScript = new Script("Original Script");
         var command1 = new MouseMoveCommand(new Point(100, 200));
-        var command2 = new MouseClickCommand(new Point(150, 250), MouseButton.Left, ClickType.Click);
+        var command2 = new MouseClickCommand(MouseButton.Left, ClickType.Click);
         originalScript.AddCommand(command1);
         originalScript.AddCommand(command2);
 
@@ -240,7 +240,7 @@ public class ScriptTests
         // Arrange
         var script = new Script("Test Script");
         script.AddCommand(new MouseMoveCommand(new Point(100, 200)));
-        script.AddCommand(new MouseClickCommand(new Point(150, 250), MouseButton.Left, ClickType.Click));
+        script.AddCommand(new MouseClickCommand(MouseButton.Left, ClickType.Click));
         script.AddCommand(new KeyboardCommand("Hello World"));
         script.AddCommand(new SleepCommand(TimeSpan.FromMilliseconds(500)));
 

@@ -28,8 +28,9 @@ public class CoreServicesIntegrationTests
             services.AddSingleton<IFileStorageService>(sp =>
                 new JsonFileStorageService(sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<JsonFileStorageService>>(), tempDir));
 
+            services.AddSingleton<IGlobalHotkeyService>(sp => new FakeGlobalHotkeyService());
             services.AddSingleton<IScriptManager>(sp =>
-                new ScriptManager(sp.GetRequiredService<IFileStorageService>(), sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<ScriptManager>>()));
+                new ScriptManager(sp.GetRequiredService<IFileStorageService>(), sp.GetRequiredService<IGlobalHotkeyService>(), sp.GetRequiredService<Microsoft.Extensions.Logging.ILogger<ScriptManager>>()));
 
             var provider = services.BuildServiceProvider();
             var scriptManager = provider.GetRequiredService<IScriptManager>();
@@ -61,6 +62,18 @@ public class CoreServicesIntegrationTests
         {
             try { Directory.Delete(tempDir, recursive: true); } catch { }
         }
+    }
+
+    private sealed class FakeGlobalHotkeyService : IGlobalHotkeyService
+    {
+        public event EventHandler<HotkeyPressedEventArgs>? HotkeyPressed;
+        public Task RegisterHotkeyAsync(HotkeyDefinition hotkey) => Task.CompletedTask;
+        public Task UnregisterHotkeyAsync(HotkeyDefinition hotkey) => Task.CompletedTask;
+        public Task UnregisterAllHotkeysAsync() => Task.CompletedTask;
+        public Task<IEnumerable<HotkeyDefinition>> GetRegisteredHotkeysAsync() =>
+            Task.FromResult<IEnumerable<HotkeyDefinition>>(Array.Empty<HotkeyDefinition>());
+        public Task<bool> IsHotkeyRegisteredAsync(HotkeyDefinition hotkey) => Task.FromResult(false);
+        public Task<bool> IsReadyAsync() => Task.FromResult(true);
     }
 }
 

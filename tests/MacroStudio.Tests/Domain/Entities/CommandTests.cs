@@ -53,26 +53,24 @@ public class CommandTests
     public void MouseClickCommand_Constructor_SetsPropertiesCorrectly()
     {
         // Arrange
-        var position = new Point(150, 250);
         var button = MouseButton.Right;
         var clickType = ClickType.Click;
 
         // Act
-        var command = new MouseClickCommand(position, button, clickType);
+        var command = new MouseClickCommand(button, clickType);
 
         // Assert
-        Assert.Equal(position, command.Position);
         Assert.Equal(button, command.Button);
         Assert.Equal(clickType, command.Type);
         Assert.Equal("Mouse Click", command.DisplayName);
-        Assert.Equal("Click Right at (150, 250)", command.Description);
+        Assert.Equal("Click Right", command.Description);
     }
 
     [Fact]
     public void MouseClickCommand_IsValid_WithValidParameters_ReturnsTrue()
     {
         // Arrange
-        var command = new MouseClickCommand(new Point(100, 200), MouseButton.Left, ClickType.Click);
+        var command = new MouseClickCommand(MouseButton.Left, ClickType.Click);
 
         // Act
         var isValid = command.IsValid();
@@ -82,10 +80,10 @@ public class CommandTests
     }
 
     [Fact]
-    public void MouseClickCommand_IsValid_WithNegativePosition_ReturnsFalse()
+    public void MouseClickCommand_IsValid_WithInvalidButton_ReturnsFalse()
     {
         // Arrange
-        var command = new MouseClickCommand(new Point(-10, 200), MouseButton.Left, ClickType.Click);
+        var command = new MouseClickCommand((MouseButton)999, ClickType.Click);
 
         // Act
         var isValid = command.IsValid();
