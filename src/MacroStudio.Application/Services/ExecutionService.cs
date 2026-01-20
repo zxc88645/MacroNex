@@ -18,6 +18,10 @@ public sealed class ExecutionService : IExecutionService, IDisposable
     private readonly ILogger<ExecutionService> _logger;
     private readonly object _lockObject = new();
 
+    // 追蹤每個腳本的執行狀態（以腳本ID為鍵）
+    private readonly Dictionary<Guid, ScriptExecutionContext> _activeExecutions = new();
+
+    // 向後兼容：保留最後啟動的腳本作為"當前"腳本
     private CancellationTokenSource? _cts;
     private Task? _executionTask;
     private readonly ManualResetEventSlim _pauseEvent = new(true);
@@ -26,6 +30,38 @@ public sealed class ExecutionService : IExecutionService, IDisposable
     private Script? _currentScript;
     private int _currentCommandIndex;
     private ExecutionState _state = ExecutionState.Idle;
+
+    /// <summary>
+    /// 內部類別：追蹤單個腳本的執行上下文
+    /// </summary>
+    private sealed class ScriptExecutionContext
+    {
+        public Script Script { get; }
+        public ExecutionSession Session { get; }
+        public CancellationTokenSource CancellationTokenSource { get; }
+        public Task ExecutionTask { get; set; } = null!;
+        public ManualResetEventSlim PauseEvent { get; }
+        public int CurrentCommandIndex { get; set; }
+        public ExecutionState State { get; set; }
+
+        public ScriptExecutionContext(Script script, ExecutionSession session)
+        {
+            Script = script;
+            Session = session;
+            CancellationTokenSource = new CancellationTokenSource();
+            PauseEvent = new ManualResetEventSlim(true);
+            CurrentCommandIndex = 0;
+            State = ExecutionState.Running;
+        }
+
+        public void Dispose()
+        {
+            try { CancellationTokenSource?.Cancel(); } catch { }
+            try { PauseEvent?.Set(); } catch { }
+            try { CancellationTokenSource?.Dispose(); } catch { }
+            try { PauseEvent?.Dispose(); } catch { }
+        }
+    }
 
     private readonly HotkeyDefinition _killSwitchHotkey =
         HotkeyDefinition.Create("Kill Switch", HotkeyModifiers.Control | HotkeyModifiers.Shift, VirtualKey.VK_ESCAPE);
@@ -76,10 +112,22 @@ public sealed class ExecutionService : IExecutionService, IDisposable
         if (script == null) throw new ArgumentNullException(nameof(script));
         options ??= ExecutionOptions.Default();
 
+        // 檢查該腳本是否已經在執行中
         lock (_lockObject)
         {
-            if (_executionTask is { IsCompleted: false })
-                throw new InvalidOperationException("Execution is already active.");
+            if (_activeExecutions.TryGetValue(script.Id, out var existingContext))
+            {
+                if (existingContext.ExecutionTask is { IsCompleted: false })
+                {
+                    throw new InvalidOperationException($"Script '{script.Name}' (ID: {script.Id}) is already executing.");
+                }
+                else
+                {
+                    // 任務已完成但未清理，先清理
+                    existingContext.Dispose();
+                    _activeExecutions.Remove(script.Id);
+                }
+            }
         }
 
         // Validate script synchronously (fast, no I/O)
@@ -100,13 +148,21 @@ public sealed class ExecutionService : IExecutionService, IDisposable
             catch { /* Ignore logging errors */ }
         });
 
-        _cts = new CancellationTokenSource();
-        _pauseEvent.Set();
-
-        CurrentScript = script;
-        CurrentCommandIndex = 0;
         var session = new ExecutionSession(script, options);
-        CurrentSession = session;
+        var context = new ScriptExecutionContext(script, session);
+
+        lock (_lockObject)
+        {
+            _activeExecutions[script.Id] = context;
+            
+            // 向後兼容：更新"當前"腳本為最後啟動的腳本
+            _cts = context.CancellationTokenSource;
+            _pauseEvent.Set(); // 保持向後兼容
+            CurrentScript = script;
+            CurrentCommandIndex = 0;
+            CurrentSession = session;
+            State = ExecutionState.Running;
+        }
 
         // Register kill switch hotkey (best-effort, fire and forget to avoid delay)
         // Don't await to avoid blocking execution start
@@ -125,101 +181,193 @@ public sealed class ExecutionService : IExecutionService, IDisposable
             }
         });
 
-        var prev = State;
-        State = ExecutionState.Running;
-        RaiseStateChanged(prev, State, session.Id, "Execution started");
+        RaiseStateChanged(ExecutionState.Idle, ExecutionState.Running, session.Id, "Execution started");
 
-        _executionTask = Task.Run(() => ExecutionLoopAsync(session, _cts.Token), _cts.Token);
+        // 啟動執行任務
+        context.ExecutionTask = Task.Run(async () => await ExecutionLoopAsync(context), context.CancellationTokenSource.Token);
+        
+        // 向後兼容：更新單一執行任務
+        lock (_lockObject)
+        {
+            _executionTask = context.ExecutionTask;
+        }
     }
 
     public Task PauseExecutionAsync()
     {
-        var session = CurrentSession;
-        if (session == null || State != ExecutionState.Running)
-            throw new InvalidOperationException("Execution is not running.");
+        ScriptExecutionContext? context;
+        lock (_lockObject)
+        {
+            if (CurrentScript == null || !_activeExecutions.TryGetValue(CurrentScript.Id, out context))
+            {
+                throw new InvalidOperationException("No script is currently executing.");
+            }
 
-        _pauseEvent.Reset();
-        var prev = State;
-        State = ExecutionState.Paused;
-        session.ChangeState(ExecutionState.Paused);
-        RaiseStateChanged(prev, State, session.Id, "Paused");
+            if (context.State != ExecutionState.Running)
+            {
+                throw new InvalidOperationException("Execution is not running.");
+            }
+        }
+
+        context.PauseEvent.Reset();
+        var prev = context.State;
+        context.State = ExecutionState.Paused;
+        context.Session.ChangeState(ExecutionState.Paused);
+        
+        lock (_lockObject)
+        {
+            State = ExecutionState.Paused;
+        }
+        
+        RaiseStateChanged(prev, ExecutionState.Paused, context.Session.Id, "Paused");
         return Task.CompletedTask;
     }
 
     public Task ResumeExecutionAsync()
     {
-        var session = CurrentSession;
-        if (session == null || State != ExecutionState.Paused)
-            throw new InvalidOperationException("Execution is not paused.");
+        ScriptExecutionContext? context;
+        lock (_lockObject)
+        {
+            if (CurrentScript == null || !_activeExecutions.TryGetValue(CurrentScript.Id, out context))
+            {
+                throw new InvalidOperationException("No script is currently paused.");
+            }
 
-        _pauseEvent.Set();
-        var prev = State;
-        State = ExecutionState.Running;
-        session.ChangeState(ExecutionState.Running);
-        RaiseStateChanged(prev, State, session.Id, "Resumed");
+            if (context.State != ExecutionState.Paused)
+            {
+                throw new InvalidOperationException("Execution is not paused.");
+            }
+        }
+
+        context.PauseEvent.Set();
+        var prev = context.State;
+        context.State = ExecutionState.Running;
+        context.Session.ChangeState(ExecutionState.Running);
+        
+        lock (_lockObject)
+        {
+            State = ExecutionState.Running;
+        }
+        
+        RaiseStateChanged(prev, ExecutionState.Running, context.Session.Id, "Resumed");
         return Task.CompletedTask;
     }
 
     public Task StopExecutionAsync()
     {
-        var session = CurrentSession;
-        if (session == null)
+        ScriptExecutionContext? context;
+        lock (_lockObject)
         {
-            State = ExecutionState.Stopped;
-            return Task.CompletedTask;
+            if (CurrentScript == null || !_activeExecutions.TryGetValue(CurrentScript.Id, out context))
+            {
+                State = ExecutionState.Stopped;
+                return Task.CompletedTask;
+            }
         }
 
-        _logger.LogInformation("Stopping execution (session {SessionId})", session.Id);
-        _cts?.Cancel();
-        _pauseEvent.Set();
+        _logger.LogInformation("Stopping execution (session {SessionId}, script {ScriptId})", context.Session.Id, context.Script.Id);
+        context.CancellationTokenSource.Cancel();
+        context.PauseEvent.Set();
 
-        var prev = State;
-        State = ExecutionState.Stopped;
-        session.ChangeState(ExecutionState.Stopped);
-        RaiseStateChanged(prev, State, session.Id, "Stopped");
-
-        CurrentCommandIndex = 0;
+        var prev = context.State;
+        context.State = ExecutionState.Stopped;
+        context.Session.ChangeState(ExecutionState.Stopped);
+        
+        lock (_lockObject)
+        {
+            State = ExecutionState.Stopped;
+            CurrentCommandIndex = 0;
+        }
+        
+        RaiseStateChanged(prev, ExecutionState.Stopped, context.Session.Id, "Stopped");
         return Task.CompletedTask;
     }
 
     public async Task StepExecutionAsync()
     {
-        var session = CurrentSession;
-        if (session == null || CurrentScript == null)
-            throw new InvalidOperationException("No script is loaded.");
+        ScriptExecutionContext? context;
+        lock (_lockObject)
+        {
+            if (CurrentScript == null)
+                throw new InvalidOperationException("No script is loaded.");
 
-        if (State == ExecutionState.Running)
-            throw new InvalidOperationException("Cannot step while execution is running.");
+            // 如果腳本沒有在執行，創建一個臨時上下文用於單步執行
+            if (!_activeExecutions.TryGetValue(CurrentScript.Id, out context))
+            {
+                // 創建臨時上下文用於單步執行
+                var session = new ExecutionSession(CurrentScript, ExecutionOptions.Default());
+                context = new ScriptExecutionContext(CurrentScript, session);
+                _activeExecutions[CurrentScript.Id] = context;
+                CurrentSession = session;
+            }
 
-        var prev = State;
-        State = ExecutionState.Stepping;
-        session.ChangeState(ExecutionState.Stepping);
-        RaiseStateChanged(prev, State, session.Id, "Step");
+            if (context.State == ExecutionState.Running)
+                throw new InvalidOperationException("Cannot step while execution is running.");
+        }
 
-        await ExecuteSingleCommandAsync(session, CurrentCommandIndex, CancellationToken.None);
+        var prev = context.State;
+        context.State = ExecutionState.Stepping;
+        context.Session.ChangeState(ExecutionState.Stepping);
+        
+        lock (_lockObject)
+        {
+            State = ExecutionState.Stepping;
+        }
+        
+        RaiseStateChanged(prev, ExecutionState.Stepping, context.Session.Id, "Step");
+
+        await ExecuteSingleCommandAsync(context, context.CurrentCommandIndex, CancellationToken.None);
 
         // After one step, pause
-        prev = State;
-        State = ExecutionState.Paused;
-        session.ChangeState(ExecutionState.Paused);
-        RaiseStateChanged(prev, State, session.Id, "Paused after step");
+        prev = context.State;
+        context.State = ExecutionState.Paused;
+        context.Session.ChangeState(ExecutionState.Paused);
+        
+        lock (_lockObject)
+        {
+            State = ExecutionState.Paused;
+        }
+        
+        RaiseStateChanged(prev, ExecutionState.Paused, context.Session.Id, "Paused after step");
     }
 
     public Task TerminateExecutionAsync()
     {
-        var session = CurrentSession;
-        _logger.LogWarning("Terminate requested (session {SessionId})", session?.Id);
+        _logger.LogWarning("Terminate requested for all executions");
 
-        _cts?.Cancel();
-        _pauseEvent.Set();
-
-        if (session != null)
+        // 終止所有正在執行的腳本
+        List<ScriptExecutionContext> contextsToTerminate;
+        lock (_lockObject)
         {
-            var prev = State;
-            State = ExecutionState.Terminated;
-            session.ChangeState(ExecutionState.Terminated);
-            RaiseStateChanged(prev, State, session.Id, "Terminated");
-            RaiseCompleted(session, ExecutionState.Terminated, false, "Terminated by user/kill switch", null);
+            contextsToTerminate = _activeExecutions.Values.ToList();
+        }
+
+        foreach (var context in contextsToTerminate)
+        {
+            try
+            {
+                context.CancellationTokenSource.Cancel();
+                context.PauseEvent.Set();
+                
+                var prev = context.State;
+                context.State = ExecutionState.Terminated;
+                context.Session.ChangeState(ExecutionState.Terminated);
+                RaiseStateChanged(prev, ExecutionState.Terminated, context.Session.Id, "Terminated");
+                RaiseCompleted(context.Session, ExecutionState.Terminated, false, "Terminated by user/kill switch", null);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error terminating execution for script {ScriptId}", context.Script.Id);
+            }
+        }
+
+        // 向後兼容：更新當前狀態
+        lock (_lockObject)
+        {
+            if (CurrentSession != null)
+            {
+                State = ExecutionState.Terminated;
+            }
         }
 
         return Task.CompletedTask;
@@ -270,33 +418,53 @@ public sealed class ExecutionService : IExecutionService, IDisposable
 
     public TimeSpan? GetEstimatedRemainingTime()
     {
-        var script = CurrentScript;
-        if (script == null) return null;
-
-        var idx = CurrentCommandIndex;
-        if (idx < 0 || idx >= script.CommandCount) return null;
-
-        var remaining = TimeSpan.Zero;
-        for (var i = idx; i < script.CommandCount; i++)
+        ScriptExecutionContext? context;
+        lock (_lockObject)
         {
-            remaining = remaining.Add(script.Commands[i].Delay);
-            if (script.Commands[i] is SleepCommand s)
-                remaining = remaining.Add(s.Duration);
+            if (CurrentScript == null)
+            {
+                return null;
+            }
+
+            // 如果腳本仍在執行中，使用執行上下文
+            if (_activeExecutions.TryGetValue(CurrentScript.Id, out context))
+            {
+                return CalculateRemainingTime(context);
+            }
+
+            // 如果執行已完成，使用 CurrentSession 計算剩餘時間
+            if (CurrentSession != null && CurrentScript != null)
+            {
+                var script = CurrentScript;
+                var idx = CurrentCommandIndex;
+                if (idx < 0 || idx >= script.CommandCount) return null;
+
+                var remaining = TimeSpan.Zero;
+                for (var i = idx; i < script.CommandCount; i++)
+                {
+                    remaining = remaining.Add(script.Commands[i].Delay);
+                    if (script.Commands[i] is SleepCommand s)
+                        remaining = remaining.Add(s.Duration);
+                }
+
+                var speed = CurrentSession.Options.SpeedMultiplier <= 0 ? 1.0 : CurrentSession.Options.SpeedMultiplier;
+                if (speed <= 0) speed = 1.0;
+
+                return TimeSpan.FromMilliseconds(remaining.TotalMilliseconds / speed);
+            }
+
+            return null;
         }
-
-        var session = CurrentSession;
-        var speed = session?.Options.SpeedMultiplier ?? 1.0;
-        if (speed <= 0) speed = 1.0;
-
-        return TimeSpan.FromMilliseconds(remaining.TotalMilliseconds / speed);
     }
 
-    private async Task ExecutionLoopAsync(ExecutionSession session, CancellationToken ct)
+    private async Task ExecutionLoopAsync(ScriptExecutionContext context)
     {
+        var session = context.Session;
+        var script = session.Script;
+        var ct = context.CancellationTokenSource.Token;
+
         try
         {
-            var script = session.Script;
-
             if (_safetyService.IsKillSwitchActive)
                 throw new InvalidOperationException("Kill switch is active.");
 
@@ -312,10 +480,10 @@ public sealed class ExecutionService : IExecutionService, IDisposable
                 await _inputSimulator.DelayAsync(session.Options.CountdownDuration);
             }
 
-            for (var i = CurrentCommandIndex; i < script.CommandCount; i++)
+            for (var i = context.CurrentCommandIndex; i < script.CommandCount; i++)
             {
                 ct.ThrowIfCancellationRequested();
-                _pauseEvent.Wait(ct);
+                context.PauseEvent.Wait(ct);
 
                 if (_safetyService.IsKillSwitchActive)
                     throw new InvalidOperationException("Kill switch is active.");
@@ -324,13 +492,22 @@ public sealed class ExecutionService : IExecutionService, IDisposable
                 if (DateTime.UtcNow - started > session.Options.MaxExecutionTime)
                     throw new InvalidOperationException("Execution time limit exceeded.");
 
-                await ExecuteSingleCommandAsync(session, i, ct);
+                await ExecuteSingleCommandAsync(context, i, ct);
             }
 
-            var prev = State;
-            State = ExecutionState.Completed;
+            lock (_lockObject)
+            {
+                context.State = ExecutionState.Completed;
+                // 如果這是當前腳本，更新狀態
+                if (CurrentScript?.Id == script.Id)
+                {
+                    State = ExecutionState.Completed;
+                    CurrentCommandIndex = script.CommandCount;
+                }
+            }
+
             session.ChangeState(ExecutionState.Completed);
-            RaiseStateChanged(prev, State, session.Id, "Completed");
+            RaiseStateChanged(ExecutionState.Running, ExecutionState.Completed, session.Id, "Completed");
             RaiseCompleted(session, ExecutionState.Completed, true, "Completed successfully", null);
         }
         catch (OperationCanceledException)
@@ -339,24 +516,71 @@ public sealed class ExecutionService : IExecutionService, IDisposable
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Execution failed (session {SessionId})", session.Id);
+            _logger.LogError(ex, "Execution failed (session {SessionId}, script {ScriptId})", session.Id, script.Id);
             session.SetError(ex);
 
-            var prev = State;
-            State = ExecutionState.Failed;
-            RaiseStateChanged(prev, State, session.Id, "Failed");
+            lock (_lockObject)
+            {
+                context.State = ExecutionState.Failed;
+                // 如果這是當前腳本，更新狀態
+                if (CurrentScript?.Id == script.Id)
+                {
+                    State = ExecutionState.Failed;
+                }
+            }
+
+            RaiseStateChanged(ExecutionState.Running, ExecutionState.Failed, session.Id, "Failed");
             RaiseExecutionError(ex, session.Id, "Execution loop", canContinue: false);
             RaiseCompleted(session, ExecutionState.Failed, false, "Execution failed", ex);
         }
         finally
         {
-            // Unregister kill switch hotkey best-effort
-            try { await _globalHotkeyService.UnregisterHotkeyAsync(_killSwitchHotkey); } catch { }
+            // 清理該腳本的執行狀態
+            lock (_lockObject)
+            {
+                _activeExecutions.Remove(script.Id);
+                
+                // 如果這是當前腳本，且狀態是終止或失敗，清理當前狀態
+                // 但如果是 Completed，保留狀態以便查詢統計信息
+                if (CurrentScript?.Id == script.Id)
+                {
+                    if (context.State == ExecutionState.Terminated || 
+                        context.State == ExecutionState.Failed ||
+                        context.State == ExecutionState.Stopped)
+                    {
+                        CurrentScript = null;
+                        CurrentSession = null;
+                        CurrentCommandIndex = 0;
+                        if (State == ExecutionState.Running || State == ExecutionState.Paused)
+                        {
+                            State = ExecutionState.Idle;
+                        }
+                    }
+                    // Completed 狀態保留 CurrentScript 和 CurrentSession，以便查詢統計信息
+                    // 這些將在下一次執行時被覆蓋，或在 Dispose 時清理
+                }
+            }
+
+            // 清理資源
+            context.Dispose();
+
+            // Unregister kill switch hotkey best-effort (僅當沒有其他執行時)
+            lock (_lockObject)
+            {
+                if (_activeExecutions.Count == 0)
+                {
+                    _ = Task.Run(async () =>
+                    {
+                        try { await _globalHotkeyService.UnregisterHotkeyAsync(_killSwitchHotkey); } catch { }
+                    });
+                }
+            }
         }
     }
 
-    private async Task ExecuteSingleCommandAsync(ExecutionSession session, int index, CancellationToken ct)
+    private async Task ExecuteSingleCommandAsync(ScriptExecutionContext context, int index, CancellationToken ct)
     {
+        var session = context.Session;
         var script = session.Script;
         if (index < 0 || index >= script.CommandCount)
             return;
@@ -406,11 +630,23 @@ public sealed class ExecutionService : IExecutionService, IDisposable
 
             sw.Stop();
 
-            CurrentCommandIndex = index + 1;
-            session.UpdateProgress(CurrentCommandIndex);
+            lock (_lockObject)
+            {
+                context.CurrentCommandIndex = index + 1;
+                session.UpdateProgress(context.CurrentCommandIndex);
+                
+                // 如果這是當前腳本，更新當前命令索引
+                if (CurrentScript?.Id == script.Id)
+                {
+                    CurrentCommandIndex = context.CurrentCommandIndex;
+                }
+            }
 
             CommandExecuted?.Invoke(this, new CommandExecutedEventArgs(command, session.Id, index, true, sw.Elapsed));
-            ProgressChanged?.Invoke(this, new ExecutionProgressEventArgs(session.Id, CurrentCommandIndex, script.CommandCount, session.ElapsedTime, GetEstimatedRemainingTime()));
+            
+            // 計算剩餘時間（僅針對該腳本）
+            var remainingTime = CalculateRemainingTime(context);
+            ProgressChanged?.Invoke(this, new ExecutionProgressEventArgs(session.Id, context.CurrentCommandIndex, script.CommandCount, session.ElapsedTime, remainingTime));
         }
         catch (Exception ex)
         {
@@ -418,6 +654,26 @@ public sealed class ExecutionService : IExecutionService, IDisposable
             CommandExecuted?.Invoke(this, new CommandExecutedEventArgs(command, session.Id, index, false, sw.Elapsed, ex));
             throw;
         }
+    }
+
+    private TimeSpan? CalculateRemainingTime(ScriptExecutionContext context)
+    {
+        var script = context.Script;
+        var idx = context.CurrentCommandIndex;
+        if (idx < 0 || idx >= script.CommandCount) return null;
+
+        var remaining = TimeSpan.Zero;
+        for (var i = idx; i < script.CommandCount; i++)
+        {
+            remaining = remaining.Add(script.Commands[i].Delay);
+            if (script.Commands[i] is SleepCommand s)
+                remaining = remaining.Add(s.Duration);
+        }
+
+        var speed = context.Session.Options.SpeedMultiplier <= 0 ? 1.0 : context.Session.Options.SpeedMultiplier;
+        if (speed <= 0) speed = 1.0;
+
+        return TimeSpan.FromMilliseconds(remaining.TotalMilliseconds / speed);
     }
 
     private void RaiseStateChanged(ExecutionState previous, ExecutionState current, Guid sessionId, string? reason)
@@ -451,6 +707,19 @@ public sealed class ExecutionService : IExecutionService, IDisposable
 
     public void Dispose()
     {
+        // 終止所有正在執行的腳本
+        List<ScriptExecutionContext> contextsToDispose;
+        lock (_lockObject)
+        {
+            contextsToDispose = _activeExecutions.Values.ToList();
+            _activeExecutions.Clear();
+        }
+
+        foreach (var context in contextsToDispose)
+        {
+            try { context.Dispose(); } catch { }
+        }
+
         try { _cts?.Cancel(); } catch { }
         try { _pauseEvent.Set(); } catch { }
         try { _globalHotkeyService.HotkeyPressed -= OnHotkeyPressed; } catch { }

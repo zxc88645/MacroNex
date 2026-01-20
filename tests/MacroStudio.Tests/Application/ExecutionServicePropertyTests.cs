@@ -89,6 +89,140 @@ public class ExecutionServicePropertyTests
         return script;
     }
 
+    /// <summary>
+    /// 測試相同腳本不能同時執行
+    /// </summary>
+    [Property]
+    public bool SameScriptCannotRunConcurrently(NonEmptyString scriptName)
+    {
+        var name = scriptName.Get.Trim();
+        if (string.IsNullOrWhiteSpace(name))
+            return true;
+
+        var logger = NullLogger<ExecutionService>.Instance;
+        var inputSimulator = new FakeInputSimulator();
+        var hotkeys = new FakeGlobalHotkeyService();
+        var safety = new SafetyService(NullLogger<SafetyService>.Instance);
+        var service = new ExecutionService(inputSimulator, hotkeys, safety, logger);
+
+        // 創建一個有足夠命令的腳本，確保執行時間足夠長
+        var script = CreateScript(name, 10);
+        var options = ExecutionOptions.Debug();
+
+        try
+        {
+            // 啟動腳本（異步啟動，不等待完成）
+            var startTask = service.StartExecutionAsync(script, options);
+            
+            // 等待一小段時間確保腳本已開始執行
+            Thread.Sleep(100);
+            
+            // 檢查腳本是否正在執行
+            if (service.State != ExecutionState.Running)
+            {
+                // 如果腳本已經完成（太快），這個測試用例不適用
+                startTask.GetAwaiter().GetResult(); // 等待完成
+                return true; // 跳過這個測試用例
+            }
+            
+            // 現在腳本應該正在執行，嘗試再次啟動同一個腳本應該拋出異常
+            bool exceptionThrown = false;
+            try
+            {
+                service.StartExecutionAsync(script, options).GetAwaiter().GetResult();
+            }
+            catch (InvalidOperationException ex)
+            {
+                // 應該拋出 InvalidOperationException
+                exceptionThrown = true;
+                // 錯誤訊息應該包含腳本ID或名稱
+                if (!ex.Message.Contains(script.Id.ToString()) && !ex.Message.Contains(script.Name))
+                {
+                    return false;
+                }
+            }
+
+            if (!exceptionThrown)
+            {
+                return false; // 應該拋出異常但沒有
+            }
+
+            // 等待第一個腳本完成
+            WaitUntilCompleted(service, timeoutMs: 2000);
+
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        finally
+        {
+            service.Dispose();
+        }
+    }
+
+    /// <summary>
+    /// 測試不同腳本可以同時執行
+    /// </summary>
+    [Property]
+    public bool DifferentScriptsCanRunConcurrently(NonEmptyString scriptName1, NonEmptyString scriptName2)
+    {
+        var name1 = scriptName1.Get.Trim();
+        var name2 = scriptName2.Get.Trim();
+        if (string.IsNullOrWhiteSpace(name1) || string.IsNullOrWhiteSpace(name2) || name1 == name2)
+            return true; // 跳過無效或相同的名稱
+
+        var logger = NullLogger<ExecutionService>.Instance;
+        var inputSimulator = new FakeInputSimulator();
+        var hotkeys = new FakeGlobalHotkeyService();
+        var safety = new SafetyService(NullLogger<SafetyService>.Instance);
+        var service = new ExecutionService(inputSimulator, hotkeys, safety, logger);
+
+        var script1 = CreateScript(name1, 3);
+        var script2 = CreateScript(name2, 3);
+        var options = ExecutionOptions.Debug();
+
+        try
+        {
+            // 啟動第一個腳本
+            service.StartExecutionAsync(script1, options).GetAwaiter().GetResult();
+            
+            // 稍微等待確保第一個腳本已啟動
+            Thread.Sleep(50);
+
+            // 嘗試啟動第二個不同的腳本，應該成功（不拋出異常）
+            bool exceptionThrown = false;
+            try
+            {
+                service.StartExecutionAsync(script2, options).GetAwaiter().GetResult();
+            }
+            catch (InvalidOperationException)
+            {
+                // 不同腳本不應該拋出異常
+                exceptionThrown = true;
+            }
+
+            if (exceptionThrown)
+            {
+                return false; // 不同腳本應該可以同時執行
+            }
+
+            // 等待兩個腳本都完成
+            WaitUntilCompleted(service, timeoutMs: 2000);
+
+            return true;
+        }
+        catch (Exception)
+        {
+            return false;
+        }
+        finally
+        {
+            service.Dispose();
+        }
+    }
+
     private static bool WaitUntilCompleted(ExecutionService service, int timeoutMs)
     {
         var sw = System.Diagnostics.Stopwatch.StartNew();
@@ -100,6 +234,18 @@ public class ExecutionServicePropertyTests
             {
                 return true;
             }
+            Thread.Sleep(10);
+        }
+        return false;
+    }
+
+    private static bool WaitUntil(Func<bool> condition, int timeoutMs)
+    {
+        var sw = System.Diagnostics.Stopwatch.StartNew();
+        while (sw.ElapsedMilliseconds < timeoutMs)
+        {
+            if (condition())
+                return true;
             Thread.Sleep(10);
         }
         return false;
