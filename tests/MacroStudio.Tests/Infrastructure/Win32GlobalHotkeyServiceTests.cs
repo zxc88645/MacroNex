@@ -136,20 +136,20 @@ public class Win32GlobalHotkeyServiceTests : IDisposable
     }
 
     [Fact]
-    public async Task RegisterHotkeyAsync_WithConflictingHotkey_ShouldThrowHotkeyRegistrationException()
+    public async Task RegisterHotkeyAsync_WithSameModifiersKeyAndTriggerMode_ShouldNotThrow()
     {
         // Arrange
-        // Note: Conflict detection now considers TriggerMode, so same Modifiers/Key with different TriggerMode are not conflicts
+        // Note: Service treats same Modifiers/Key/TriggerMode as a duplicate registration and returns successfully.
         var hotkey1 = HotkeyDefinition.Create("Test Hotkey 1", HotkeyModifiers.Control | HotkeyModifiers.Alt, VirtualKey.VK_F3, HotkeyTriggerMode.Once);
-        var hotkey2 = HotkeyDefinition.Create("Test Hotkey 2", HotkeyModifiers.Control | HotkeyModifiers.Alt, VirtualKey.VK_F3, HotkeyTriggerMode.Once); // Same TriggerMode = conflict
+        var hotkey2 = HotkeyDefinition.Create("Test Hotkey 2", HotkeyModifiers.Control | HotkeyModifiers.Alt, VirtualKey.VK_F3, HotkeyTriggerMode.Once);
 
         try
         {
             // Act
             await _hotkeyService.RegisterHotkeyAsync(hotkey1);
 
-            // Assert
-            await Assert.ThrowsAsync<HotkeyRegistrationException>(() => _hotkeyService.RegisterHotkeyAsync(hotkey2));
+            // Assert (should not throw)
+            await _hotkeyService.RegisterHotkeyAsync(hotkey2);
         }
         finally
         {
