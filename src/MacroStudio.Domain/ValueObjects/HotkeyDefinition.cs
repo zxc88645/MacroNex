@@ -31,6 +31,12 @@ public record HotkeyDefinition
     public HotkeyTriggerMode TriggerMode { get; init; }
 
     /// <summary>
+    /// When true, the hotkey press will be swallowed by low-level hook implementations
+    /// (i.e., not passed through to the foreground application).
+    /// </summary>
+    public bool SwallowKeystroke { get; init; } = true;
+
+    /// <summary>
     /// Initializes a new instance of the HotkeyDefinition record.
     /// </summary>
     /// <param name="id">The unique identifier for this hotkey.</param>
@@ -38,7 +44,7 @@ public record HotkeyDefinition
     /// <param name="modifiers">The modifier keys.</param>
     /// <param name="key">The main key.</param>
     /// <param name="triggerMode">The trigger mode for this hotkey.</param>
-    public HotkeyDefinition(Guid id, string name, HotkeyModifiers modifiers, VirtualKey key, HotkeyTriggerMode triggerMode = HotkeyTriggerMode.Once)
+    public HotkeyDefinition(Guid id, string name, HotkeyModifiers modifiers, VirtualKey key, HotkeyTriggerMode triggerMode = HotkeyTriggerMode.Once, bool swallowKeystroke = true)
     {
         if (string.IsNullOrWhiteSpace(name))
             throw new ArgumentException("Hotkey name cannot be null or whitespace", nameof(name));
@@ -51,6 +57,7 @@ public record HotkeyDefinition
         Modifiers = modifiers;
         Key = key;
         TriggerMode = triggerMode;
+        SwallowKeystroke = swallowKeystroke;
     }
 
     /// <summary>
@@ -61,9 +68,9 @@ public record HotkeyDefinition
     /// <param name="key">The main key.</param>
     /// <param name="triggerMode">The trigger mode for this hotkey.</param>
     /// <returns>A new HotkeyDefinition instance.</returns>
-    public static HotkeyDefinition Create(string name, HotkeyModifiers modifiers, VirtualKey key, HotkeyTriggerMode triggerMode = HotkeyTriggerMode.Once)
+    public static HotkeyDefinition Create(string name, HotkeyModifiers modifiers, VirtualKey key, HotkeyTriggerMode triggerMode = HotkeyTriggerMode.Once, bool swallowKeystroke = true)
     {
-        return new HotkeyDefinition(Guid.NewGuid(), name, modifiers, key, triggerMode);
+        return new HotkeyDefinition(Guid.NewGuid(), name, modifiers, key, triggerMode, swallowKeystroke);
     }
 
     /// <summary>

@@ -85,6 +85,7 @@ public static class ServiceCollectionExtensions
         // Register global hotkey service
         services.AddSingleton<IGlobalHotkeyService, Win32GlobalHotkeyService>();
         services.AddSingleton<IRecordingHotkeyHookService, Win32RecordingHotkeyHookService>();
+        services.AddSingleton<IScriptHotkeyHookService, Win32ScriptHotkeyHookService>();
         
         // Register storage services
         services.AddScoped<IFileStorageService, JsonFileStorageService>();

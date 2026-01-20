@@ -12,7 +12,7 @@ namespace MacroStudio.Application.Services;
 public class ScriptManager : IScriptManager
 {
     private readonly IFileStorageService _storageService;
-    private readonly IGlobalHotkeyService _hotkeyService;
+    private readonly IScriptHotkeyHookService _scriptHotkeyHookService;
     private readonly ILogger<ScriptManager> _logger;
     private readonly Dictionary<Guid, Script> _scriptCache;
     private readonly Dictionary<Guid, HotkeyDefinition> _registeredHotkeys = new();
@@ -22,12 +22,12 @@ public class ScriptManager : IScriptManager
     /// Initializes a new instance of the ScriptManager class.
     /// </summary>
     /// <param name="storageService">File storage service for persistence.</param>
-    /// <param name="hotkeyService">Global hotkey service for script trigger hotkeys.</param>
+    /// <param name="scriptHotkeyHookService">Hook-based hotkey service for script trigger hotkeys.</param>
     /// <param name="logger">Logger for diagnostic information.</param>
-    public ScriptManager(IFileStorageService storageService, IGlobalHotkeyService hotkeyService, ILogger<ScriptManager> logger)
+    public ScriptManager(IFileStorageService storageService, IScriptHotkeyHookService scriptHotkeyHookService, ILogger<ScriptManager> logger)
     {
         _storageService = storageService ?? throw new ArgumentNullException(nameof(storageService));
-        _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
+        _scriptHotkeyHookService = scriptHotkeyHookService ?? throw new ArgumentNullException(nameof(scriptHotkeyHookService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _scriptCache = new Dictionary<Guid, Script>();
         
@@ -167,8 +167,7 @@ public class ScriptManager : IScriptManager
                 throw new InvalidOperationException($"Script validation failed: {errors}");
             }
 
-            // Unregister old hotkey if it changed
-            // First, check if hotkey changed and get the old hotkey (inside lock)
+            // Update cached hotkey mapping if it changed
             HotkeyDefinition? oldHotkeyToUnregister = null;
             bool hotkeyChanged = false;
             lock (_cacheLock)
@@ -188,22 +187,11 @@ public class ScriptManager : IScriptManager
                 }
             }
 
-            // Unregister old hotkey outside the lock to avoid deadlock
+            // Remove old hotkey from mapping outside the lock
             if (hotkeyChanged && oldHotkeyToUnregister != null)
             {
-                try
-                {
-                    await _hotkeyService.UnregisterHotkeyAsync(oldHotkeyToUnregister);
-                    lock (_cacheLock)
-                    {
-                        _registeredHotkeys.Remove(script.Id);
-                    }
-                    _logger.LogInformation("Unregistered old hotkey for script {ScriptId}: {Hotkey}", script.Id, oldHotkeyToUnregister);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to unregister old hotkey for script {ScriptId}", script.Id);
-                }
+                lock (_cacheLock) { _registeredHotkeys.Remove(script.Id); }
+                _logger.LogInformation("Removed old hotkey mapping for script {ScriptId}: {Hotkey}", script.Id, oldHotkeyToUnregister);
             }
 
             // Save to storage immediately
@@ -215,22 +203,17 @@ public class ScriptManager : IScriptManager
                 _scriptCache[script.Id] = script;
             }
 
-            // Register new hotkey if specified
+            // Update mapping with new hotkey if specified
             if (script.TriggerHotkey != null)
             {
-                try
-                {
-                    await _hotkeyService.RegisterHotkeyAsync(script.TriggerHotkey);
-                    lock (_cacheLock)
-                    {
-                        _registeredHotkeys[script.Id] = script.TriggerHotkey;
-                    }
-                    _logger.LogInformation("Registered trigger hotkey for script {ScriptId}: {Hotkey}", script.Id, script.TriggerHotkey);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Failed to register trigger hotkey for script {ScriptId}", script.Id);
-                }
+                lock (_cacheLock) { _registeredHotkeys[script.Id] = script.TriggerHotkey; }
+                _logger.LogInformation("Updated trigger hotkey mapping for script {ScriptId}: {Hotkey}", script.Id, script.TriggerHotkey);
+            }
+
+            // Apply all mappings to hook service (atomic replace).
+            lock (_cacheLock)
+            {
+                _scriptHotkeyHookService.SetScriptHotkeys(new Dictionary<Guid, HotkeyDefinition>(_registeredHotkeys));
             }
 
             _logger.LogInformation("Updated script {ScriptId}", script.Id);
@@ -250,29 +233,32 @@ public class ScriptManager : IScriptManager
         try
         {
             var scripts = await GetAllScriptsAsync();
+            var hotkeys = new Dictionary<Guid, HotkeyDefinition>();
             foreach (var script in scripts)
             {
                 if (script.TriggerHotkey != null)
                 {
-                    try
-                    {
-                        await _hotkeyService.RegisterHotkeyAsync(script.TriggerHotkey);
-                        lock (_cacheLock)
-                        {
-                            _registeredHotkeys[script.Id] = script.TriggerHotkey;
-                        }
-                        _logger.LogDebug("Registered trigger hotkey for script {ScriptId}: {Hotkey}", script.Id, script.TriggerHotkey);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogWarning(ex, "Failed to register trigger hotkey for script {ScriptId}", script.Id);
-                    }
+                    hotkeys[script.Id] = script.TriggerHotkey;
                 }
             }
+            lock (_cacheLock)
+            {
+                _registeredHotkeys.Clear();
+                foreach (var kv in hotkeys) _registeredHotkeys[kv.Key] = kv.Value;
+            }
+            _scriptHotkeyHookService.SetScriptHotkeys(hotkeys);
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "Error registering script hotkeys");
+        }
+    }
+
+    private void ApplyHotkeyMappingsToHook()
+    {
+        lock (_cacheLock)
+        {
+            _scriptHotkeyHookService.SetScriptHotkeys(new Dictionary<Guid, HotkeyDefinition>(_registeredHotkeys));
         }
     }
 
@@ -283,159 +269,6 @@ public class ScriptManager : IScriptManager
         {
             _logger.LogDebug("Deleting script {ScriptId}", id);
 
-            // Get script before deletion to check for hotkey
-            // Try cache first, then load from storage if not in cache
-            Script? scriptToDelete = null;
-            lock (_cacheLock)
-            {
-                _scriptCache.TryGetValue(id, out scriptToDelete);
-            }
-
-            // If not in cache, try to load from storage to get hotkey info
-            if (scriptToDelete == null)
-            {
-                try
-                {
-                    scriptToDelete = await GetScriptAsync(id);
-                }
-                catch
-                {
-                    // Script might not exist, continue with deletion attempt
-                }
-            }
-
-            // Determine which hotkey to unregister
-            // Priority: 1) Check _registeredHotkeys (most reliable), 2) Check script's TriggerHotkey
-            HotkeyDefinition? hotkeyToUnregister = null;
-            
-            // First, check if we have it tracked in _registeredHotkeys
-            lock (_cacheLock)
-            {
-                _logger.LogWarning("Deleting script {ScriptId}. Checking for hotkey to unregister...", id);
-                _logger.LogWarning("  _registeredHotkeys count: {Count}", _registeredHotkeys.Count);
-                foreach (var kvp in _registeredHotkeys)
-                {
-                    _logger.LogWarning("  Tracked: ScriptId={ScriptId}, Hotkey={Hotkey}", kvp.Key, kvp.Value);
-                }
-                
-                if (_registeredHotkeys.TryGetValue(id, out hotkeyToUnregister))
-                {
-                    // Found in tracking dictionary, use it
-                    _logger.LogWarning("Found hotkey in tracking dictionary for script {ScriptId}: {Hotkey}", id, hotkeyToUnregister);
-                }
-                else if (scriptToDelete?.TriggerHotkey != null)
-                {
-                    // Not in tracking but script has hotkey (might be registered by MainViewModel)
-                    // Use the script's hotkey definition
-                    hotkeyToUnregister = scriptToDelete.TriggerHotkey;
-                    _logger.LogWarning("Hotkey not in tracking, using script's TriggerHotkey for script {ScriptId}: {Hotkey}", id, hotkeyToUnregister);
-                }
-                else
-                {
-                    _logger.LogWarning("No hotkey found for script {ScriptId} (not in tracking and script has no TriggerHotkey)", id);
-                }
-            }
-
-            // Unregister the hotkey if we found one
-            if (hotkeyToUnregister != null)
-            {
-                _logger.LogWarning("Attempting to unregister hotkey for deleted script {ScriptId}: {Hotkey} (Modifiers={Modifiers}, Key={Key}, TriggerMode={TriggerMode})", 
-                    id, hotkeyToUnregister, hotkeyToUnregister.Modifiers, hotkeyToUnregister.Key, hotkeyToUnregister.TriggerMode);
-                
-                // Verify hotkey is registered before attempting unregister
-                var wasRegisteredBefore = await _hotkeyService.IsHotkeyRegisteredAsync(hotkeyToUnregister);
-                _logger.LogWarning("Hotkey registration status before unregister for script {ScriptId}: {IsRegistered}", id, wasRegisteredBefore);
-                
-                try
-                {
-                    await _hotkeyService.UnregisterHotkeyAsync(hotkeyToUnregister);
-                    
-                    // Verify hotkey was actually unregistered
-                    var isRegisteredAfter = await _hotkeyService.IsHotkeyRegisteredAsync(hotkeyToUnregister);
-                    _logger.LogWarning("Hotkey registration status after unregister for script {ScriptId}: {IsRegistered}", id, isRegisteredAfter);
-                    
-                    if (isRegisteredAfter)
-                    {
-                        _logger.LogError("CRITICAL: Hotkey {Hotkey} is still registered after unregister attempt for script {ScriptId}!", hotkeyToUnregister, id);
-                        
-                        // Try to get all registered hotkeys to see what's still there
-                        var allRegistered = await _hotkeyService.GetRegisteredHotkeysAsync();
-                        _logger.LogWarning("Currently registered hotkeys after failed unregister: {Count}", allRegistered.Count());
-                        foreach (var h in allRegistered)
-                        {
-                            _logger.LogWarning("  Still registered: {Hotkey} (Modifiers={Modifiers}, Key={Key}, TriggerMode={TriggerMode})", 
-                                h, h.Modifiers, h.Key, h.TriggerMode);
-                        }
-                    }
-                    else
-                    {
-                        _logger.LogWarning("Confirmed: Hotkey {Hotkey} was successfully unregistered for script {ScriptId}", hotkeyToUnregister, id);
-                    }
-                    
-                    lock (_cacheLock)
-                    {
-                        _registeredHotkeys.Remove(id);
-                    }
-                    _logger.LogWarning("Successfully unregistered hotkey for deleted script {ScriptId}: {Hotkey}", id, hotkeyToUnregister);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "First attempt failed to unregister hotkey for script {ScriptId}: {Error}. Hotkey: {Hotkey}", 
-                        id, ex.Message, hotkeyToUnregister);
-                    
-                    // If unregistration failed, try to find the hotkey by Modifiers/Key/TriggerMode
-                    // This handles cases where the HotkeyDefinition instance is different
-                    try
-                    {
-                        _logger.LogDebug("Attempting fallback: getting all registered hotkeys to find match");
-                        var allRegistered = await _hotkeyService.GetRegisteredHotkeysAsync();
-                        _logger.LogDebug("Found {Count} registered hotkeys", allRegistered.Count());
-                        
-                        var matchingHotkey = allRegistered.FirstOrDefault(h => 
-                            h.Modifiers == hotkeyToUnregister.Modifiers && 
-                            h.Key == hotkeyToUnregister.Key &&
-                            h.TriggerMode == hotkeyToUnregister.TriggerMode);
-                        
-                        if (matchingHotkey != null)
-                        {
-                            _logger.LogInformation("Found matching hotkey by Modifiers/Key/TriggerMode: {MatchingHotkey}, attempting unregister again", matchingHotkey);
-                            await _hotkeyService.UnregisterHotkeyAsync(matchingHotkey);
-                            _logger.LogInformation("Successfully unregistered hotkey for deleted script {ScriptId} using fallback method", id);
-                        }
-                        else
-                        {
-                            _logger.LogWarning("No matching hotkey found by Modifiers/Key/TriggerMode for script {ScriptId}. Searched {Count} registered hotkeys", 
-                                id, allRegistered.Count());
-                        }
-                    }
-                    catch (Exception fallbackEx)
-                    {
-                        _logger.LogWarning(fallbackEx, "Fallback unregistration also failed for script {ScriptId}", id);
-                    }
-                    
-                    // Still remove from tracking even if unregistration failed
-                    lock (_cacheLock)
-                    {
-                        _registeredHotkeys.Remove(id);
-                    }
-                }
-            }
-            else if (scriptToDelete?.TriggerHotkey != null)
-            {
-                // Even if not in tracking, try to unregister using the script's hotkey
-                // This handles edge cases where hotkey was registered but not tracked
-                _logger.LogDebug("Hotkey not in tracking but script has hotkey, attempting unregister anyway");
-                try
-                {
-                    await _hotkeyService.UnregisterHotkeyAsync(scriptToDelete.TriggerHotkey);
-                    _logger.LogInformation("Successfully unregistered untracked hotkey for deleted script {ScriptId}", id);
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogDebug(ex, "Could not unregister hotkey for script {ScriptId} (may not have been registered)", id);
-                }
-            }
-
             var deleted = await _storageService.DeleteScriptAsync(id);
 
             if (deleted)
@@ -444,8 +277,9 @@ public class ScriptManager : IScriptManager
                 lock (_cacheLock)
                 {
                     _scriptCache.Remove(id);
-                    _registeredHotkeys.Remove(id); // Ensure removal even if not found above
+                    _registeredHotkeys.Remove(id);
                 }
+                ApplyHotkeyMappingsToHook();
 
                 _logger.LogInformation("Deleted script {ScriptId}", id);
             }

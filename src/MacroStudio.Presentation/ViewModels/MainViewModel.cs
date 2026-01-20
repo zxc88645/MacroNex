@@ -17,8 +17,8 @@ public partial class MainViewModel : ObservableObject
     private readonly IExecutionService _executionService;
     private readonly ILoggingService _loggingService;
     private readonly ISafetyService _safetyService;
-    private readonly IGlobalHotkeyService _hotkeyService;
     private readonly IRecordingHotkeyHookService _recordingHotkeyHookService;
+    private readonly IScriptHotkeyHookService _scriptHotkeyHookService;
 
     public ScriptListViewModel ScriptList { get; }
     public CommandGridViewModel CommandGrid { get; }
@@ -44,8 +44,8 @@ public partial class MainViewModel : ObservableObject
         IExecutionService executionService,
         ILoggingService loggingService,
         ISafetyService safetyService,
-        IGlobalHotkeyService hotkeyService,
         IRecordingHotkeyHookService recordingHotkeyHookService,
+        IScriptHotkeyHookService scriptHotkeyHookService,
         ScriptListViewModel scriptListViewModel,
         CommandGridViewModel commandGridViewModel,
         ExecutionControlViewModel executionControlViewModel,
@@ -58,8 +58,8 @@ public partial class MainViewModel : ObservableObject
         _executionService = executionService ?? throw new ArgumentNullException(nameof(executionService));
         _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
         _safetyService = safetyService ?? throw new ArgumentNullException(nameof(safetyService));
-        _hotkeyService = hotkeyService ?? throw new ArgumentNullException(nameof(hotkeyService));
         _recordingHotkeyHookService = recordingHotkeyHookService ?? throw new ArgumentNullException(nameof(recordingHotkeyHookService));
+        _scriptHotkeyHookService = scriptHotkeyHookService ?? throw new ArgumentNullException(nameof(scriptHotkeyHookService));
 
         ScriptList = scriptListViewModel ?? throw new ArgumentNullException(nameof(scriptListViewModel));
         CommandGrid = commandGridViewModel ?? throw new ArgumentNullException(nameof(commandGridViewModel));
@@ -82,8 +82,8 @@ public partial class MainViewModel : ObservableObject
             StatusText = $"KILL SWITCH: {args.Reason}";
         };
 
-        // Listen for hotkey presses to trigger scripts
-        _hotkeyService.HotkeyPressed += OnHotkeyPressed;
+        // Listen for script hotkey presses from low-level hook (no RegisterHotKey).
+        _scriptHotkeyHookService.HotkeyPressed += OnScriptHotkeyPressed;
         // Listen for recording control hotkeys from low-level hook (no RegisterHotKey).
         _recordingHotkeyHookService.HotkeyPressed += OnRecordingHotkeyPressed;
 
@@ -91,7 +91,7 @@ public partial class MainViewModel : ObservableObject
         _ = InitializeAsync();
     }
 
-    private async void OnHotkeyPressed(object? sender, HotkeyPressedEventArgs e)
+    private async void OnScriptHotkeyPressed(object? sender, HotkeyPressedEventArgs e)
     {
         // Don't trigger scripts when capturing hotkeys
         if (_isHotkeyCaptureActive)
@@ -104,9 +104,11 @@ public partial class MainViewModel : ObservableObject
             {
                 // Find script with matching hotkey
                 var scripts = await _scriptManager.GetAllScriptsAsync();
-                var script = scripts.FirstOrDefault(s => s.TriggerHotkey != null && 
-                    s.TriggerHotkey.Modifiers == e.Hotkey.Modifiers && 
-                    s.TriggerHotkey.Key == e.Hotkey.Key);
+                // Hook service encodes ScriptId in Hotkey.Name
+                if (!Guid.TryParse(e.Hotkey.Name, out var scriptId))
+                    return;
+
+                var script = scripts.FirstOrDefault(s => s.Id == scriptId);
 
                 if (script != null && script.TriggerHotkey != null)
                 {
@@ -164,60 +166,7 @@ public partial class MainViewModel : ObservableObject
                 }
                 else
                 {
-                    // No script found for this hotkey - this might be a leftover hotkey from a deleted script
-                    // or a Windows message queue delay (WM_HOTKEY message processed after script deletion)
-                    // Try to unregister it to prevent it from intercepting keyboard input
-                    _ = Task.Run(async () =>
-                    {
-                        try
-                        {
-                            // First check if the hotkey is actually registered
-                            var isRegistered = await _hotkeyService.IsHotkeyRegisteredAsync(e.Hotkey);
-                            
-                            if (!isRegistered)
-                            {
-                                // Hotkey is not registered - this is normal if:
-                                // 1. Script was deleted and hotkey was already unregistered
-                                // 2. Windows message queue had a delayed WM_HOTKEY message
-                                // Don't log this as it's expected behavior in these cases
-                                return;
-                            }
-
-                            // Hotkey is still registered but no script found - this is an orphaned hotkey
-                            await _loggingService.LogWarningAsync("No script found for hotkey, attempting to unregister orphaned hotkey", new Dictionary<string, object>
-                            {
-                                { "Hotkey", e.Hotkey.GetDisplayString() },
-                                { "Modifiers", e.Hotkey.Modifiers.ToString() },
-                                { "Key", e.Hotkey.Key.ToString() }
-                            });
-
-                            // Try to unregister the orphaned hotkey
-                            try
-                            {
-                                await _hotkeyService.UnregisterHotkeyAsync(e.Hotkey);
-                                await _loggingService.LogInfoAsync("Successfully unregistered orphaned hotkey", new Dictionary<string, object>
-                                {
-                                    { "Hotkey", e.Hotkey.GetDisplayString() }
-                                });
-                            }
-                            catch (HotkeyRegistrationException hre) when (hre.Message.Contains("not registered"))
-                            {
-                                // Hotkey was not registered (might have been unregistered between check and unregister)
-                                // This can happen due to race conditions - not an error
-                                // Don't log this as it's expected in race condition scenarios
-                            }
-                            catch (Exception unregisterEx)
-                            {
-                                await _loggingService.LogErrorAsync("Failed to unregister orphaned hotkey", unregisterEx, new Dictionary<string, object>
-                                {
-                                    { "Hotkey", e.Hotkey.GetDisplayString() },
-                                    { "ExceptionType", unregisterEx.GetType().Name },
-                                    { "ExceptionMessage", unregisterEx.Message }
-                                });
-                            }
-                        }
-                        catch { /* Ignore logging errors */ }
-                    });
+                    // Script was deleted or cache not yet refreshed; nothing to do.
                 }
             }
             catch (Exception ex)
@@ -316,53 +265,8 @@ public partial class MainViewModel : ObservableObject
     private async Task InitializeAsync()
     {
         await ScriptList.RefreshAsync();
-        
-        // Clean up orphaned hotkeys (hotkeys without corresponding scripts)
-        // This handles cases where scripts were deleted but hotkeys weren't properly unregistered
-        try
-        {
-            var allRegisteredHotkeys = await _hotkeyService.GetRegisteredHotkeysAsync();
-            var scripts = await _scriptManager.GetAllScriptsAsync();
-            var scriptHotkeys = scripts
-                .Where(s => s.TriggerHotkey != null)
-                .Select(s => new { s.TriggerHotkey!.Modifiers, s.TriggerHotkey.Key, s.TriggerHotkey.TriggerMode })
-                .ToList();
 
-            foreach (var registeredHotkey in allRegisteredHotkeys)
-            {
-                var hasMatchingScript = scriptHotkeys.Any(sh =>
-                    sh.Modifiers == registeredHotkey.Modifiers &&
-                    sh.Key == registeredHotkey.Key &&
-                    sh.TriggerMode == registeredHotkey.TriggerMode);
-
-                if (!hasMatchingScript)
-                {
-                    // Orphaned hotkey - unregister it
-                    try
-                    {
-                        await _hotkeyService.UnregisterHotkeyAsync(registeredHotkey);
-                        await _loggingService.LogInfoAsync("Cleaned up orphaned hotkey", new Dictionary<string, object>
-                        {
-                            { "Hotkey", registeredHotkey.GetDisplayString() }
-                        });
-                    }
-                    catch (Exception ex)
-                    {
-                        await _loggingService.LogErrorAsync("Failed to cleanup orphaned hotkey", ex, new Dictionary<string, object>
-                        {
-                            { "Hotkey", registeredHotkey.GetDisplayString() }
-                        });
-                    }
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            await _loggingService.LogErrorAsync("Error during hotkey cleanup", ex);
-        }
-        
-        // Register all script hotkeys through ScriptManager to ensure proper tracking
-        // This ensures hotkeys are tracked and can be properly unregistered when scripts are deleted
+        // Hook-based script hotkeys: just ask ScriptManager to rebuild the mapping for the hook service.
         await _scriptManager.RegisterAllScriptHotkeysAsync();
         
         StatusText = "Loaded scripts";
