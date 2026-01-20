@@ -82,14 +82,23 @@ public sealed class ExecutionService : IExecutionService, IDisposable
                 throw new InvalidOperationException("Execution is already active.");
         }
 
-        var validation = await ValidateScriptForExecutionAsync(script);
+        // Validate script synchronously (fast, no I/O)
+        var validation = ValidateScriptForExecutionAsync(script).GetAwaiter().GetResult();
         if (!validation.IsValid)
         {
             var errors = string.Join("; ", validation.Errors);
             throw new InvalidOperationException($"Script is not valid for execution: {errors}");
         }
 
-        _logger.LogInformation("Starting execution for script {ScriptId} ({ScriptName})", script.Id, script.Name);
+        // Log asynchronously (fire and forget)
+        _ = Task.Run(() =>
+        {
+            try
+            {
+                _logger.LogInformation("Starting execution for script {ScriptId} ({ScriptName})", script.Id, script.Name);
+            }
+            catch { /* Ignore logging errors */ }
+        });
 
         _cts = new CancellationTokenSource();
         _pauseEvent.Set();
@@ -99,18 +108,22 @@ public sealed class ExecutionService : IExecutionService, IDisposable
         var session = new ExecutionSession(script, options);
         CurrentSession = session;
 
-        // Register kill switch hotkey (best-effort)
-        try
+        // Register kill switch hotkey (best-effort, fire and forget to avoid delay)
+        // Don't await to avoid blocking execution start
+        _ = Task.Run(async () =>
         {
-            if (await _globalHotkeyService.IsReadyAsync())
+            try
             {
-                await _globalHotkeyService.RegisterHotkeyAsync(_killSwitchHotkey);
+                if (await _globalHotkeyService.IsReadyAsync())
+                {
+                    await _globalHotkeyService.RegisterHotkeyAsync(_killSwitchHotkey);
+                }
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogWarning(ex, "Failed to register kill switch hotkey");
-        }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to register kill switch hotkey");
+            }
+        });
 
         var prev = State;
         State = ExecutionState.Running;
