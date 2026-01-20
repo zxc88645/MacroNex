@@ -8,7 +8,7 @@
         xmlns:views="clr-namespace:MacroStudio.Presentation.Views"
         xmlns:conv="clr-namespace:MacroStudio.Presentation.Converters"
         mc:Ignorable="d"
-        Title="Macro Studio" Height="1200" Width="1600"
+        Title="{DynamicResource Ui.App.Title}" Height="1200" Width="1600"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource Bg0}">
     <Window.Resources>
@@ -27,15 +27,15 @@
         <Border Grid.Row="0" Background="{DynamicResource Bg1}" Padding="14">
             <DockPanel LastChildFill="True">
                 <StackPanel Orientation="Horizontal">
-                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="Macro Studio" />
-                    <TextBlock Margin="10,3,0,0" Foreground="{DynamicResource TextMutedBrush}" Text="Desktop Automation" />
+                    <TextBlock FontSize="18" FontWeight="SemiBold" Text="{DynamicResource Ui.Topbar.Title}" />
+                    <TextBlock Margin="10,3,0,0" Foreground="{DynamicResource TextMutedBrush}" Text="{DynamicResource Ui.Topbar.Subtitle}" />
                 </StackPanel>
                 <Button DockPanel.Dock="Right"
                         Margin="12,0,0,0"
                         Style="{DynamicResource DangerButton}"
                         Visibility="{Binding IsKillSwitchActive, Converter={StaticResource BoolToVisibility}}"
                         Command="{Binding ResetKillSwitchCommand}"
-                        Content="Reset Kill Switch" />
+                        Content="{DynamicResource Ui.Topbar.ResetKillSwitch}" />
                 <TextBlock DockPanel.Dock="Right"
                            Foreground="{DynamicResource TextMutedBrush}"
                            VerticalAlignment="Center"
@@ -45,7 +45,7 @@
 
         <!-- Main tabs -->
         <TabControl Grid.Row="1" Margin="14" Background="{DynamicResource Bg0}" BorderBrush="{DynamicResource BorderBrushSoft}">
-            <TabItem Header="工作區">
+            <TabItem Header="{DynamicResource Ui.Tab.Workspace}">
                 <!-- Main content: scripts + commands + execution controls -->
                 <Grid Margin="0">
                     <Grid.ColumnDefinitions>
@@ -73,7 +73,7 @@
                         <Border Grid.Row="1" Style="{DynamicResource CardBorder}" Padding="14">
                             <DockPanel LastChildFill="True">
                                 <StackPanel DockPanel.Dock="Top" Orientation="Vertical">
-                                    <TextBlock FontWeight="SemiBold" Text="Execution" Margin="0,0,0,8"/>
+                                    <TextBlock FontWeight="SemiBold" Text="{DynamicResource Ui.Execution.Title}" Margin="0,0,0,8"/>
 
                                     <TextBlock Foreground="{DynamicResource TextMutedBrush}" Text="{Binding ExecutionControls.State}" Margin="0,0,0,8"/>
 
@@ -85,23 +85,23 @@
                                                Text="{Binding ExecutionControls.CurrentCommandIndex}"/>
 
                                     <WrapPanel Margin="0,6,0,8">
-                                        <Button Content="Start" Width="72" Margin="0,0,8,8" Style="{DynamicResource PrimaryButton}" Command="{Binding ExecutionControls.StartCommand}"/>
-                                        <Button Content="Pause" Width="72" Margin="0,0,8,8" Command="{Binding ExecutionControls.PauseCommand}"/>
-                                        <Button Content="Resume" Width="72" Margin="0,0,8,8" Command="{Binding ExecutionControls.ResumeCommand}"/>
-                                        <Button Content="Stop" Width="72" Margin="0,0,8,8" Command="{Binding ExecutionControls.StopCommand}"/>
-                                        <Button Content="Step" Width="72" Margin="0,0,8,8" Command="{Binding ExecutionControls.StepCommand}"/>
-                                        <Button Content="Terminate" Width="88" Margin="0,0,8,8" Style="{DynamicResource DangerButton}" Command="{Binding ExecutionControls.TerminateCommand}"/>
+                                        <Button Content="{DynamicResource Ui.Execution.Start}" Width="72" Margin="0,0,8,8" Style="{DynamicResource PrimaryButton}" Command="{Binding ExecutionControls.StartCommand}"/>
+                                        <Button Content="{DynamicResource Ui.Execution.Pause}" Width="72" Margin="0,0,8,8" Command="{Binding ExecutionControls.PauseCommand}"/>
+                                        <Button Content="{DynamicResource Ui.Execution.Resume}" Width="72" Margin="0,0,8,8" Command="{Binding ExecutionControls.ResumeCommand}"/>
+                                        <Button Content="{DynamicResource Ui.Execution.Stop}" Width="72" Margin="0,0,8,8" Command="{Binding ExecutionControls.StopCommand}"/>
+                                        <Button Content="{DynamicResource Ui.Execution.Step}" Width="72" Margin="0,0,8,8" Command="{Binding ExecutionControls.StepCommand}"/>
+                                        <Button Content="{DynamicResource Ui.Execution.Terminate}" Width="88" Margin="0,0,8,8" Style="{DynamicResource DangerButton}" Command="{Binding ExecutionControls.TerminateCommand}"/>
                                     </WrapPanel>
 
-                                    <GroupBox Header="Options" Padding="10" BorderBrush="{DynamicResource BorderBrushSoft}" Foreground="{DynamicResource TextMutedBrush}">
+                                    <GroupBox Header="{DynamicResource Ui.Execution.Options}" Padding="10" BorderBrush="{DynamicResource BorderBrushSoft}" Foreground="{DynamicResource TextMutedBrush}">
                                         <StackPanel>
                                             <DockPanel Margin="0,0,0,6">
-                                                <TextBlock Width="120" Text="Speed" VerticalAlignment="Center"/>
+                                                <TextBlock Width="120" Text="{DynamicResource Ui.Execution.Speed}" VerticalAlignment="Center"/>
                                                 <TextBox Text="{Binding ExecutionControls.SpeedMultiplier, UpdateSourceTrigger=PropertyChanged}" />
                                             </DockPanel>
-                                            <CheckBox Content="Show countdown" IsChecked="{Binding ExecutionControls.ShowCountdown}" />
+                                            <CheckBox Content="{DynamicResource Ui.Execution.ShowCountdown}" IsChecked="{Binding ExecutionControls.ShowCountdown}" />
                                             <DockPanel Margin="0,6,0,0">
-                                                <TextBlock Width="120" Text="Countdown (s)" VerticalAlignment="Center"/>
+                                                <TextBlock Width="120" Text="{DynamicResource Ui.Execution.CountdownSeconds}" VerticalAlignment="Center"/>
                                                 <TextBox Text="{Binding ExecutionControls.CountdownSeconds, UpdateSourceTrigger=PropertyChanged}" />
                                             </DockPanel>
                                             <TextBlock Foreground="{DynamicResource DangerBrush}" Margin="0,10,0,0" Text="{Binding ExecutionControls.LastError}" TextWrapping="Wrap"/>
@@ -114,7 +114,7 @@
                 </Grid>
             </TabItem>
 
-            <TabItem Header="設定">
+            <TabItem Header="{DynamicResource Ui.Tab.Settings}">
                 <ContentPresenter Content="{Binding Settings}"/>
             </TabItem>
         </TabControl>
@@ -123,22 +123,22 @@
         <Border Grid.Row="2" Margin="14" Style="{DynamicResource CardBorder}" Padding="14">
             <DockPanel LastChildFill="True">
                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                    <TextBlock FontWeight="SemiBold" Text="Logs" />
+                    <TextBlock FontWeight="SemiBold" Text="{DynamicResource Ui.Logs.Title}" />
                     <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                        <Button Content="Refresh" Margin="0,0,8,0" Command="{Binding Logging.RefreshCommand}" />
-                        <Button Content="Clear" Margin="0,0,8,0" Command="{Binding Logging.ClearCommand}" />
-                        <Button Content="Copy" Margin="0,0,8,0" Command="{Binding Logging.CopyCommand}" />
-                        <Button Content="Export" Style="{DynamicResource PrimaryButton}" Command="{Binding Logging.ExportCommand}" />
+                        <Button Content="{DynamicResource Ui.Logs.Refresh}" Margin="0,0,8,0" Command="{Binding Logging.RefreshCommand}" />
+                        <Button Content="{DynamicResource Ui.Logs.Clear}" Margin="0,0,8,0" Command="{Binding Logging.ClearCommand}" />
+                        <Button Content="{DynamicResource Ui.Logs.Copy}" Margin="0,0,8,0" Command="{Binding Logging.CopyCommand}" />
+                        <Button Content="{DynamicResource Ui.Logs.Export}" Style="{DynamicResource PrimaryButton}" Command="{Binding Logging.ExportCommand}" />
                     </StackPanel>
                 </DockPanel>
 
                 <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                     <TextBox Width="260" Margin="0,0,8,0"
                              Text="{Binding Logging.SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Search logs"/>
+                             ToolTip="{DynamicResource Ui.Logs.SearchTooltip}"/>
                     <TextBox Width="80" Margin="0,0,8,0"
                              Text="{Binding Logging.MaxResults, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Max results"/>
+                             ToolTip="{DynamicResource Ui.Logs.MaxResultsTooltip}"/>
                 </DockPanel>
 
                 <ListBox x:Name="LogsListBox" ItemsSource="{Binding Logging.Entries}" BorderThickness="0">

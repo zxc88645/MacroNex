@@ -5,16 +5,16 @@
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
         Background="{DynamicResource Bg0}"
-        Title="Pick Position"
+        Title="{DynamicResource Ui.PickPoint.WindowTitle}"
         KeyDown="Window_KeyDown">
     <Border Style="{DynamicResource CardBorder}" Padding="16" Margin="14">
         <StackPanel>
-            <TextBlock FontSize="16" FontWeight="SemiBold" Text="Pick Mouse Position" />
+            <TextBlock FontSize="16" FontWeight="SemiBold" Text="{DynamicResource Ui.PickPoint.Title}" />
             <TextBlock Foreground="{DynamicResource TextMutedBrush}" Margin="0,6,0,0"
-                       Text="請把滑鼠移到目標位置，然後按 F2 以擷取目前座標。" TextWrapping="Wrap" />
+                       Text="{DynamicResource Ui.PickPoint.Instruction}" TextWrapping="Wrap" />
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
-                <Button Content="Cancel" Width="90" Margin="0,0,10,0" Click="Cancel_Click"/>
-                <Button Content="OK" Width="90" IsDefault="True" Click="Ok_Click"/>
+                <Button Content="{DynamicResource Ui.Dialog.Cancel}" Width="90" Margin="0,0,10,0" Click="Cancel_Click"/>
+                <Button Content="{DynamicResource Ui.Dialog.Ok}" Width="90" IsDefault="True" Click="Ok_Click"/>
             </StackPanel>
         </StackPanel>
     </Border>

@@ -2,7 +2,9 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
+using MacroStudio.Presentation.Services;
 using MacroStudio.Presentation.Views;
+using System.Collections.ObjectModel;
 
 namespace MacroStudio.Presentation.ViewModels;
 
@@ -11,8 +13,20 @@ public partial class SettingsViewModel : ObservableObject
     private readonly ISettingsService _settingsService;
     private readonly IRecordingHotkeyHookService _recordingHotkeyHookService;
     private readonly ILoggingService _logging;
+    private readonly LocalizationService _localization;
 
     private AppSettings? _settings;
+
+    public sealed record UiLanguageOption(string CultureName, string DisplayName);
+
+    public ObservableCollection<UiLanguageOption> AvailableUiLanguages { get; } = new()
+    {
+        new UiLanguageOption("zh-TW", "繁體中文"),
+        new UiLanguageOption("en-US", "English"),
+    };
+
+    [ObservableProperty]
+    private UiLanguageOption? selectedUiLanguage;
 
     [ObservableProperty]
     private HotkeyDefinition? recordingStartHotkey;
@@ -26,11 +40,16 @@ public partial class SettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? lastMessage;
 
-    public SettingsViewModel(ISettingsService settingsService, IRecordingHotkeyHookService recordingHotkeyHookService, ILoggingService logging)
+    public SettingsViewModel(
+        ISettingsService settingsService,
+        IRecordingHotkeyHookService recordingHotkeyHookService,
+        ILoggingService logging,
+        LocalizationService localization)
     {
         _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _recordingHotkeyHookService = recordingHotkeyHookService ?? throw new ArgumentNullException(nameof(recordingHotkeyHookService));
         _logging = logging ?? throw new ArgumentNullException(nameof(logging));
+        _localization = localization ?? throw new ArgumentNullException(nameof(localization));
 
         // Fire-and-forget initialization (load persisted settings and register hotkeys).
         _ = InitializeAsync();
@@ -46,6 +65,11 @@ public partial class SettingsViewModel : ObservableObject
         {
             _settings = await _settingsService.LoadAsync();
             _settings.EnsureDefaults();
+
+            SelectedUiLanguage = AvailableUiLanguages.FirstOrDefault(x =>
+                string.Equals(x.CultureName, _settings.UiLanguage, StringComparison.OrdinalIgnoreCase))
+                ?? AvailableUiLanguages.FirstOrDefault(x => x.CultureName == "zh-TW")
+                ?? AvailableUiLanguages.First();
 
             RecordingStartHotkey = _settings.RecordingStartHotkey;
             RecordingPauseHotkey = _settings.RecordingPauseHotkey;
@@ -109,6 +133,36 @@ public partial class SettingsViewModel : ObservableObject
         await _settingsService.SaveAsync(_settings);
         ApplyToHookService();
         LastMessage = $"{keyName} 已更新";
+    }
+
+    partial void OnSelectedUiLanguageChanged(UiLanguageOption? oldValue, UiLanguageOption? newValue)
+    {
+        if (newValue == null) return;
+
+        // Fire-and-forget to keep UI responsive; persist and then apply language at runtime.
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                _settings ??= AppSettings.Default();
+                _settings.EnsureDefaults();
+
+                _settings.UiLanguage = newValue.CultureName;
+                await _settingsService.SaveAsync(_settings);
+
+                System.Windows.Application.Current?.Dispatcher.Invoke(() =>
+                {
+                    _localization.ApplyLanguage(newValue.CultureName);
+                });
+
+                LastMessage = "介面語言已更新";
+            }
+            catch (Exception ex)
+            {
+                LastMessage = $"介面語言更新失敗：{ex.Message}";
+                try { await _logging.LogErrorAsync("Failed to update UI language", ex); } catch { }
+            }
+        });
     }
 
     [RelayCommand]

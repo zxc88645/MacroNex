@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using MacroStudio.Presentation.Extensions;
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Infrastructure.Logging;
+using MacroStudio.Presentation.Services;
 using System.IO;
 using System.Text;
 
@@ -47,6 +48,21 @@ public partial class App : System.Windows.Application
                 args.Handled = true;
                 Shutdown(-1);
             };
+
+            // Apply persisted UI language before showing any windows.
+            try
+            {
+                var settingsService = _host.Services.GetRequiredService<ISettingsService>();
+                var localization = _host.Services.GetRequiredService<LocalizationService>();
+                // Avoid deadlock on UI thread: run async file I/O off the dispatcher thread.
+                var settings = Task.Run(() => settingsService.LoadAsync()).GetAwaiter().GetResult();
+                settings.EnsureDefaults();
+                localization.ApplyLanguage(settings.UiLanguage);
+            }
+            catch
+            {
+                // Best-effort; fall back to default language dictionary.
+            }
 
             var mainWindow = _host.Services.GetRequiredService<MainWindow>();
             mainWindow.Show();

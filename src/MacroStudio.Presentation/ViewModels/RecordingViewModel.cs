@@ -5,6 +5,7 @@ using MacroStudio.Domain.Events;
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
 using MacroStudio.Presentation.Views;
+using MacroStudio.Presentation.Utilities;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
@@ -24,7 +25,7 @@ public partial class RecordingViewModel : ObservableObject
     public ObservableCollection<Command> RecordedCommands { get; } = new();
 
     [ObservableProperty]
-    private string recordingStatusText = "Not recording";
+    private string recordingStatusText = "";
 
     [ObservableProperty]
     private bool recordMouseMovements = true;
@@ -63,24 +64,26 @@ public partial class RecordingViewModel : ObservableObject
 
     public bool IsPaused => _recordingService.CurrentSession?.State == RecordingState.Paused;
 
-    public string PauseButtonText => IsPaused ? "Resume" : "Pause";
+    public string PauseButtonText => IsPaused
+        ? UiText.Get("Ui.Recording.Resume", "Resume")
+        : UiText.Get("Ui.Recording.Pause", "Pause");
 
     private void UpdateStatusFromService()
     {
         var session = _recordingService.CurrentSession;
         if (session == null)
         {
-            RecordingStatusText = "Not recording";
+            RecordingStatusText = UiText.Get("Ui.Recording.Status.NotRecording", "Not recording");
             return;
         }
 
         RecordingStatusText = session.State switch
         {
-            RecordingState.Active => "Recording…",
-            RecordingState.Paused => "Paused",
-            RecordingState.Stopped => "Stopped",
-            RecordingState.Error => "Error",
-            _ => "Not recording"
+            RecordingState.Active => UiText.Get("Ui.Recording.Status.Recording", "Recording…"),
+            RecordingState.Paused => UiText.Get("Ui.Recording.Status.Paused", "Paused"),
+            RecordingState.Stopped => UiText.Get("Ui.Recording.Status.Stopped", "Stopped"),
+            RecordingState.Error => UiText.Get("Ui.Recording.Status.Error", "Error"),
+            _ => UiText.Get("Ui.Recording.Status.NotRecording", "Not recording")
         };
     }
 
@@ -111,7 +114,7 @@ public partial class RecordingViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            RecordingStatusText = $"Error: {ex.Message}";
+            RecordingStatusText = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
             await _loggingService.LogErrorAsync("Failed to start recording", ex);
         }
         finally
@@ -137,7 +140,7 @@ public partial class RecordingViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            RecordingStatusText = $"Error: {ex.Message}";
+            RecordingStatusText = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
             await _loggingService.LogErrorAsync("Failed to stop recording", ex);
         }
         finally
@@ -172,7 +175,7 @@ public partial class RecordingViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            RecordingStatusText = $"Error: {ex.Message}";
+            RecordingStatusText = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
             await _loggingService.LogErrorAsync("Failed to pause recording", ex);
         }
         finally
@@ -200,7 +203,7 @@ public partial class RecordingViewModel : ObservableObject
         }
         catch (Exception ex)
         {
-            RecordingStatusText = $"Error: {ex.Message}";
+            RecordingStatusText = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
             await _loggingService.LogErrorAsync("Failed to resume recording", ex);
         }
         finally
@@ -224,10 +227,10 @@ public partial class RecordingViewModel : ObservableObject
             return;
 
         var dlg = new InputDialog(
-            "Save Recording",
-            "將目前錄製的命令另存為新的腳本。",
-            "Script name:",
-            "Recorded Script");
+            UiText.Get("Ui.Dialog.SaveRecording.Title", "Save Recording"),
+            UiText.Get("Ui.Dialog.SaveRecording.Subtitle", "Save the recorded commands as a new script."),
+            UiText.Get("Ui.Dialog.SaveRecording.Label", "Script name:"),
+            UiText.Get("Ui.Dialog.SaveRecording.DefaultName", "Recorded Script"));
 
         dlg.Owner = System.Windows.Application.Current?.MainWindow;
         if (dlg.ShowDialog() != true)
@@ -298,7 +301,7 @@ public partial class RecordingViewModel : ObservableObject
     {
         System.Windows.Application.Current?.Dispatcher.Invoke(() =>
         {
-            RecordingStatusText = $"Error: {e.Error.Message}";
+            RecordingStatusText = UiText.Format("Ui.ErrorPrefix", e.Error.Message, "Error: {0}");
             StartRecordingCommand.NotifyCanExecuteChanged();
             StopRecordingCommand.NotifyCanExecuteChanged();
             PauseRecordingCommand.NotifyCanExecuteChanged();

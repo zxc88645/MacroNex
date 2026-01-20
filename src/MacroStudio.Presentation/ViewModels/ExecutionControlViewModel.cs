@@ -5,6 +5,7 @@ using MacroStudio.Domain.Events;
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
 using MacroStudio.Presentation.Views;
+using MacroStudio.Presentation.Utilities;
 
 namespace MacroStudio.Presentation.ViewModels;
 
@@ -191,7 +192,7 @@ public partial class ExecutionControlViewModel : ObservableObject
 
     private void OnExecutionError(object? sender, ExecutionErrorEventArgs e)
     {
-        LastError = $"{e.Context}: {e.Error.GetType().Name} - {e.Error.Message}";
+        LastError = UiText.Format("Ui.ErrorPrefix", $"{e.Context}: {e.Error.GetType().Name} - {e.Error.Message}", "Error: {0}");
         UpdateCanExecute();
     }
 

@@ -39,6 +39,8 @@ public static class ServiceCollectionExtensions
     /// </summary>
     private static IServiceCollection AddPresentationServices(this IServiceCollection services)
     {
+        services.AddSingleton<LocalizationService>();
+
         // Register ViewModels
         services.AddSingleton<MainViewModel>();
         services.AddSingleton<ScriptListViewModel>();

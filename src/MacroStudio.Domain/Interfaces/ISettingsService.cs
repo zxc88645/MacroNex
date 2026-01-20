@@ -16,6 +16,11 @@ public interface ISettingsService
 /// </summary>
 public class AppSettings
 {
+    /// <summary>
+    /// UI language / culture name (e.g., "zh-TW", "en-US").
+    /// </summary>
+    public string? UiLanguage { get; set; }
+
     public double DefaultSpeedMultiplier { get; set; } = 1.0;
     public bool ShowCountdown { get; set; } = true;
     public double CountdownSeconds { get; set; } = 3.0;
@@ -40,6 +45,9 @@ public class AppSettings
     /// </summary>
     public void EnsureDefaults()
     {
+        // UI language default: Traditional Chinese.
+        if (string.IsNullOrWhiteSpace(UiLanguage)) UiLanguage = "zh-TW";
+
         // Legacy settings.json may not have these fields.
         RecordingStartHotkey ??= HotkeyDefinition.Create("Recording Start", HotkeyModifiers.None, VirtualKey.VK_F9, HotkeyTriggerMode.Once);
         RecordingPauseHotkey ??= HotkeyDefinition.Create("Recording Pause", HotkeyModifiers.None, VirtualKey.VK_F11, HotkeyTriggerMode.Once);

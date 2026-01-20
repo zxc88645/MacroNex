@@ -12,22 +12,22 @@
     <Border Style="{DynamicResource CardBorder}" Padding="14">
         <DockPanel LastChildFill="True">
             <StackPanel DockPanel.Dock="Top" Orientation="Vertical" Margin="0,0,0,8">
-                <TextBlock FontWeight="SemiBold" Text="Scripts" Margin="0,0,0,8"/>
+                <TextBlock FontWeight="SemiBold" Text="{DynamicResource Ui.Scripts.Title}" Margin="0,0,0,8"/>
                 <DockPanel>
                     <TextBox Width="220" Margin="0,0,8,0"
                              Text="{Binding ScriptList.SearchText, UpdateSourceTrigger=PropertyChanged}"
-                             ToolTip="Search scripts"/>
-                    <Button Content="Search" Style="{DynamicResource PrimaryButton}" Command="{Binding ScriptList.ApplySearchCommand}" />
+                             ToolTip="{DynamicResource Ui.Scripts.SearchTooltip}"/>
+                    <Button Content="{DynamicResource Ui.Button.Search}" Style="{DynamicResource PrimaryButton}" Command="{Binding ScriptList.ApplySearchCommand}" />
                 </DockPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button Content="New" Width="72" Margin="0,0,8,0" Style="{DynamicResource PrimaryButton}" Command="{Binding ScriptList.CreateScriptCommand}" />
-                    <Button Content="Delete" Width="72" Command="{Binding ScriptList.DeleteSelectedCommand}" />
-                    <Button Content="Refresh" Width="72" Margin="8,0,0,0" Command="{Binding ScriptList.RefreshCommand}" />
+                    <Button Content="{DynamicResource Ui.Button.New}" Width="72" Margin="0,0,8,0" Style="{DynamicResource PrimaryButton}" Command="{Binding ScriptList.CreateScriptCommand}" />
+                    <Button Content="{DynamicResource Ui.Button.Delete}" Width="72" Command="{Binding ScriptList.DeleteSelectedCommand}" />
+                    <Button Content="{DynamicResource Ui.Button.Refresh}" Width="72" Margin="8,0,0,0" Command="{Binding ScriptList.RefreshCommand}" />
                 </StackPanel>
                 <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
-                    <Button Content="Import" Width="72" Margin="0,0,8,0" Command="{Binding ScriptList.ImportCommand}" />
-                    <Button Content="Export" Width="72" Margin="0,0,8,0" Command="{Binding ScriptList.ExportSelectedCommand}" />
-                    <Button Content="設置熱鍵" Width="90" Command="{Binding ScriptList.SetHotkeyCommand}" />
+                    <Button Content="{DynamicResource Ui.Button.Import}" Width="72" Margin="0,0,8,0" Command="{Binding ScriptList.ImportCommand}" />
+                    <Button Content="{DynamicResource Ui.Button.Export}" Width="72" Margin="0,0,8,0" Command="{Binding ScriptList.ExportSelectedCommand}" />
+                    <Button Content="{DynamicResource Ui.Scripts.SetHotkey}" Width="90" Command="{Binding ScriptList.SetHotkeyCommand}" />
                 </StackPanel>
             </StackPanel>
 

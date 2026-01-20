@@ -8,12 +8,13 @@
              d:DesignHeight="450" d:DesignWidth="320">
     <UserControl.Resources>
         <conv:CommandDisplayConverter x:Key="CommandDisplayConverter" />
+        <conv:ResourceFormatConverter x:Key="ResourceFormatConverter" />
     </UserControl.Resources>
     <!-- Keep this panel from growing unbounded (it lives in an Auto row in MainWindow). -->
     <Border Style="{DynamicResource CardBorder}" Padding="14" MaxHeight="340">
         <DockPanel LastChildFill="True">
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                <TextBlock FontWeight="SemiBold" Text="Recording" />
+                <TextBlock FontWeight="SemiBold" Text="{DynamicResource Ui.Recording.Title}" />
                 <TextBlock DockPanel.Dock="Right"
                            Foreground="{DynamicResource TextMutedBrush}"
                            Text="{Binding Recording.RecordingStatusText}" />
@@ -21,30 +22,30 @@
 
             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,10">
                 <WrapPanel Margin="0,0,0,8">
-                    <Button Content="Start" Width="72" Margin="0,0,8,8"
+                    <Button Content="{DynamicResource Ui.Recording.Start}" Width="72" Margin="0,0,8,8"
                             Style="{DynamicResource PrimaryButton}"
                             Command="{Binding Recording.StartRecordingCommand}" />
                     <Button Content="{Binding Recording.PauseButtonText}" Width="72" Margin="0,0,8,8"
                             Command="{Binding Recording.PauseRecordingCommand}" />
-                    <Button Content="Stop" Width="72" Margin="0,0,8,8"
+                    <Button Content="{DynamicResource Ui.Recording.Stop}" Width="72" Margin="0,0,8,8"
                             Command="{Binding Recording.StopRecordingCommand}" />
                 </WrapPanel>
 
-                <GroupBox Header="Options" Padding="10" BorderBrush="{DynamicResource BorderBrushSoft}" Foreground="{DynamicResource TextMutedBrush}">
+                <GroupBox Header="{DynamicResource Ui.Recording.Options}" Padding="10" BorderBrush="{DynamicResource BorderBrushSoft}" Foreground="{DynamicResource TextMutedBrush}">
                     <StackPanel>
-                        <CheckBox Content="Record mouse movements" IsChecked="{Binding Recording.RecordMouseMovements}" />
-                        <CheckBox Content="Record mouse clicks" IsChecked="{Binding Recording.RecordMouseClicks}" />
-                        <CheckBox Content="Record keyboard input" IsChecked="{Binding Recording.RecordKeyboardInput}" />
-                        <CheckBox Content="Filter injected/system events" IsChecked="{Binding Recording.FilterSystemEvents}" />
+                        <CheckBox Content="{DynamicResource Ui.Recording.RecordMouseMovements}" IsChecked="{Binding Recording.RecordMouseMovements}" />
+                        <CheckBox Content="{DynamicResource Ui.Recording.RecordMouseClicks}" IsChecked="{Binding Recording.RecordMouseClicks}" />
+                        <CheckBox Content="{DynamicResource Ui.Recording.RecordKeyboardInput}" IsChecked="{Binding Recording.RecordKeyboardInput}" />
+                        <CheckBox Content="{DynamicResource Ui.Recording.FilterInjectedSystemEvents}" IsChecked="{Binding Recording.FilterSystemEvents}" />
                     </StackPanel>
                 </GroupBox>
 
                 <DockPanel Margin="0,10,0,0">
                     <TextBlock Foreground="{DynamicResource TextMutedBrush}"
                                VerticalAlignment="Center"
-                               Text="{Binding Recording.TotalCommands, StringFormat=Recorded: {0}}" />
+                               Text="{Binding Recording.TotalCommands, Converter={StaticResource ResourceFormatConverter}, ConverterParameter=Ui.Recording.RecordedCountFormat}" />
                     <Button DockPanel.Dock="Right"
-                            Content="Save as Script"
+                            Content="{DynamicResource Ui.Recording.SaveAsScript}"
                             Style="{DynamicResource PrimaryButton}"
                             Command="{Binding Recording.SaveAsScriptCommand}" />
                 </DockPanel>

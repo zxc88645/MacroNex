@@ -13,13 +13,13 @@
     <Border Style="{DynamicResource CardBorder}" Padding="14">
         <DockPanel LastChildFill="True">
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
-                <TextBlock FontWeight="SemiBold" Text="Script Editor" />
+                <TextBlock FontWeight="SemiBold" Text="{DynamicResource Ui.Editor.Title}" />
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button Content="Apply Script" Margin="0,0,8,0" Style="{DynamicResource PrimaryButton}" Command="{Binding CommandGrid.ApplyScriptTextCommand}"/>
-                    <Button Content="Add Sleep" Margin="0,0,8,0" Command="{Binding CommandGrid.AddSleepCommandCommand}"/>
-                    <Button Content="Add Move" Margin="0,0,8,0" Command="{Binding CommandGrid.AddMouseMoveCommand}"/>
+                    <Button Content="{DynamicResource Ui.Editor.ApplyScript}" Margin="0,0,8,0" Style="{DynamicResource PrimaryButton}" Command="{Binding CommandGrid.ApplyScriptTextCommand}"/>
+                    <Button Content="{DynamicResource Ui.Editor.AddSleep}" Margin="0,0,8,0" Command="{Binding CommandGrid.AddSleepCommandCommand}"/>
+                    <Button Content="{DynamicResource Ui.Editor.AddMove}" Margin="0,0,8,0" Command="{Binding CommandGrid.AddMouseMoveCommand}"/>
                     <Button x:Name="AddMouseButton"
-                            Content="Add Mouse"
+                            Content="{DynamicResource Ui.Editor.AddMouse}"
                             Margin="0,0,8,0">
                         <Button.Resources>
                             <Style TargetType="{x:Type ContextMenu}">
@@ -41,14 +41,14 @@
                         </Button.Resources>
                         <Button.ContextMenu>
                             <ContextMenu>
-                                <MenuItem Header="左鍵點擊" Command="{Binding CommandGrid.AddLeftClickCommand}" />
-                                <MenuItem Header="右鍵點擊" Command="{Binding CommandGrid.AddRightClickCommand}" />
-                                <MenuItem Header="中鍵點擊" Command="{Binding CommandGrid.AddMiddleClickCommand}" />
+                                <MenuItem Header="{DynamicResource Ui.Editor.Mouse.LeftClick}" Command="{Binding CommandGrid.AddLeftClickCommand}" />
+                                <MenuItem Header="{DynamicResource Ui.Editor.Mouse.RightClick}" Command="{Binding CommandGrid.AddRightClickCommand}" />
+                                <MenuItem Header="{DynamicResource Ui.Editor.Mouse.MiddleClick}" Command="{Binding CommandGrid.AddMiddleClickCommand}" />
                             </ContextMenu>
                         </Button.ContextMenu>
                     </Button>
-                    <Button Content="Add Text" Margin="0,0,8,0" Command="{Binding CommandGrid.AddKeyboardTextCommand}"/>
-                    <Button Content="Remove Last" Command="{Binding CommandGrid.RemoveLastCommandCommand}"/>
+                    <Button Content="{DynamicResource Ui.Editor.AddText}" Margin="0,0,8,0" Command="{Binding CommandGrid.AddKeyboardTextCommand}"/>
+                    <Button Content="{DynamicResource Ui.Editor.RemoveLast}" Command="{Binding CommandGrid.RemoveLastCommandCommand}"/>
                 </StackPanel>
             </DockPanel>
 

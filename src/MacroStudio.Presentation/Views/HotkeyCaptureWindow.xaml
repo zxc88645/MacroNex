@@ -5,7 +5,7 @@
         ResizeMode="NoResize"
         SizeToContent="WidthAndHeight"
         Background="{DynamicResource Bg0}"
-        Title="設置熱鍵"
+        Title="{DynamicResource Ui.HotkeyCapture.WindowTitle}"
         Width="500"
         Height="300"
         KeyDown="Window_KeyDown"
@@ -14,8 +14,8 @@
     <Border Style="{DynamicResource CardBorder}" Padding="20" Margin="14">
         <DockPanel LastChildFill="True">
             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
-                <TextBlock FontSize="18" FontWeight="SemiBold" Text="設置腳本熱鍵" Margin="0,0,0,8"/>
-                <TextBlock Foreground="{DynamicResource TextMutedBrush}" Text="請按下您想要設置的按鍵或組合鍵" TextWrapping="Wrap"/>
+                <TextBlock FontSize="18" FontWeight="SemiBold" Text="{DynamicResource Ui.HotkeyCapture.Title}" Margin="0,0,0,8"/>
+                <TextBlock Foreground="{DynamicResource TextMutedBrush}" Text="{DynamicResource Ui.HotkeyCapture.Instruction}" TextWrapping="Wrap"/>
             </StackPanel>
 
             <Border DockPanel.Dock="Top" 
@@ -29,32 +29,32 @@
                 <TextBlock x:Name="HotkeyDisplayText"
                            FontSize="24"
                            FontWeight="Bold"
-                           Text="請按下按鍵..."
+                           Text="{DynamicResource Ui.HotkeyCapture.Placeholder}"
                            HorizontalAlignment="Center"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource TextBrush}"/>
             </Border>
 
             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
-                <TextBlock Text="觸發模式：" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                <TextBlock Text="{DynamicResource Ui.HotkeyCapture.TriggerModeLabel}" FontWeight="SemiBold" Margin="0,0,0,8"/>
                 <StackPanel Orientation="Horizontal">
-                    <RadioButton x:Name="OnceModeRadio" Content="僅一次" IsChecked="True" Margin="0,0,16,0" 
+                    <RadioButton x:Name="OnceModeRadio" Content="{DynamicResource Ui.HotkeyCapture.TriggerMode.Once}" IsChecked="True" Margin="0,0,16,0" 
                                  Checked="TriggerModeRadio_Checked"/>
-                    <RadioButton x:Name="RepeatModeRadio" Content="按住時重複" 
+                    <RadioButton x:Name="RepeatModeRadio" Content="{DynamicResource Ui.HotkeyCapture.TriggerMode.RepeatWhileHeld}" 
                                  Checked="TriggerModeRadio_Checked"/>
                 </StackPanel>
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Top" Margin="0,0,0,16">
                 <CheckBox x:Name="SwallowKeystrokeCheck"
-                          Content="吞按鍵（不傳給前景應用）"
+                          Content="{DynamicResource Ui.HotkeyCapture.SwallowKeystroke}"
                           IsChecked="True"/>
             </StackPanel>
 
             <StackPanel DockPanel.Dock="Bottom" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,14,0,0">
-                <Button Content="清除" Width="90" Margin="0,0,10,0" Click="ClearButton_Click" />
-                <Button Content="取消" Width="90" Margin="0,0,10,0" Click="CancelButton_Click" />
-                <Button Content="確認" Width="90" Style="{DynamicResource PrimaryButton}" Click="ConfirmButton_Click" IsEnabled="{Binding IsHotkeyValid}" />
+                <Button Content="{DynamicResource Ui.Button.Clear}" Width="90" Margin="0,0,10,0" Click="ClearButton_Click" />
+                <Button Content="{DynamicResource Ui.Button.Cancel}" Width="90" Margin="0,0,10,0" Click="CancelButton_Click" />
+                <Button Content="{DynamicResource Ui.Button.Confirm}" Width="90" Style="{DynamicResource PrimaryButton}" Click="ConfirmButton_Click" IsEnabled="{Binding IsHotkeyValid}" />
             </StackPanel>
         </DockPanel>
     </Border>

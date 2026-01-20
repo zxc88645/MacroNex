@@ -4,6 +4,7 @@ using MacroStudio.Application.Services;
 using MacroStudio.Domain.Entities;
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
+using MacroStudio.Presentation.Utilities;
 
 namespace MacroStudio.Presentation.ViewModels;
 
@@ -79,7 +80,7 @@ public partial class MainViewModel : ObservableObject
         _safetyService.KillSwitchActivated += (_, args) =>
         {
             IsKillSwitchActive = true;
-            StatusText = $"KILL SWITCH: {args.Reason}";
+            StatusText = UiText.Format("Ui.Status.KillSwitchPrefix", args.Reason, "KILL SWITCH: {0}");
         };
 
         // Listen for script hotkey presses from low-level hook (no RegisterHotKey).
@@ -89,6 +90,8 @@ public partial class MainViewModel : ObservableObject
 
         // Auto-initialize scripts on first load so existing scripts are scanned.
         _ = InitializeAsync();
+
+        StatusText = UiText.Get("Ui.Status.Ready", "Ready");
     }
 
     private async void OnScriptHotkeyPressed(object? sender, HotkeyPressedEventArgs e)
@@ -161,7 +164,7 @@ public partial class MainViewModel : ObservableObject
                     // Update UI on UI thread
                     System.Windows.Application.Current?.Dispatcher.Invoke(() =>
                     {
-                        StatusText = $"Executing: {script.Name}";
+                        StatusText = UiText.Format("Ui.Status.ExecutingPrefix", script.Name, "Executing: {0}");
                     });
                 }
                 else
@@ -269,7 +272,7 @@ public partial class MainViewModel : ObservableObject
         // Hook-based script hotkeys: just ask ScriptManager to rebuild the mapping for the hook service.
         await _scriptManager.RegisterAllScriptHotkeysAsync();
         
-        StatusText = "Loaded scripts";
+        StatusText = UiText.Get("Ui.Status.LoadedScripts", "Loaded scripts");
     }
 
     [RelayCommand(CanExecute = nameof(CanStartExecution))]
@@ -284,7 +287,7 @@ public partial class MainViewModel : ObservableObject
         });
 
         await _executionService.StartExecutionAsync(SelectedScript);
-        StatusText = "Executing";
+        StatusText = UiText.Get("Ui.Status.Executing", "Executing");
     }
 
     private bool CanStartExecution() => SelectedScript != null;
@@ -299,7 +302,7 @@ public partial class MainViewModel : ObservableObject
     {
         await _safetyService.DeactivateKillSwitchAsync();
         IsKillSwitchActive = _safetyService.IsKillSwitchActive;
-        StatusText = "Kill switch reset";
+        StatusText = UiText.Get("Ui.Status.KillSwitchReset", "Kill switch reset");
     }
 
     private bool CanResetKillSwitch() => IsKillSwitchActive;
