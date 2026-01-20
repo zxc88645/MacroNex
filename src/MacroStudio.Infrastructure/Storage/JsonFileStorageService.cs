@@ -332,6 +332,7 @@ public class JsonFileStorageService : IFileStorageService
             {
                 MouseMoveCommand => "MouseMove",
                 MouseClickCommand => "MouseClick",
+                KeyPressCommand => "KeyPress",
                 KeyboardCommand => "Keyboard",
                 SleepCommand => "Sleep",
                 _ => throw new NotSupportedException($"Unsupported command type: {command.GetType().Name}")
@@ -368,6 +369,14 @@ public class JsonFileStorageService : IFileStorageService
                     keyParams["keys"] = keyCmd.Keys.Select(k => k.ToString()).ToList();
                 }
                 dto.Parameters = keyParams;
+                break;
+
+            case KeyPressCommand kp:
+                dto.Parameters = new Dictionary<string, object?>
+                {
+                    ["key"] = kp.Key.ToString(),
+                    ["isDown"] = kp.IsDown
+                };
                 break;
 
             case SleepCommand sleepCmd:
@@ -453,6 +462,14 @@ public class JsonFileStorageService : IFileStorageService
                 Enum.Parse<ClickType>(GetStringParameter(dto.Parameters, "clickType"))
             ),
 
+            "KeyPress" => new KeyPressCommand(
+                dto.Id,
+                dto.Delay,
+                dto.CreatedAt,
+                Enum.Parse<VirtualKey>(GetStringParameter(dto.Parameters, "key")),
+                GetBoolParameter(dto.Parameters, "isDown")
+            ),
+
             "Keyboard" => new KeyboardCommand(
                 dto.Id,
                 dto.Delay,
@@ -473,6 +490,22 @@ public class JsonFileStorageService : IFileStorageService
             ),
 
             _ => throw new NotSupportedException($"Unsupported command type: {dto.Type}")
+        };
+    }
+
+    private bool GetBoolParameter(Dictionary<string, object?>? parameters, string key)
+    {
+        if (parameters == null || !parameters.TryGetValue(key, out var value))
+            throw new StorageException($"Missing required parameter '{key}' in command");
+
+        return value switch
+        {
+            bool b => b,
+            JsonElement element when element.ValueKind == JsonValueKind.True => true,
+            JsonElement element when element.ValueKind == JsonValueKind.False => false,
+            JsonElement element when element.ValueKind == JsonValueKind.String => bool.Parse(element.GetString() ?? "false"),
+            string s => bool.Parse(s),
+            _ => throw new StorageException($"Invalid parameter type for '{key}': expected boolean")
         };
     }
 

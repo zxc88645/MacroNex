@@ -22,6 +22,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
     private readonly ConcurrentDictionary<HotkeyDefinition, int> _hotkeyIds = new();
     private readonly ConcurrentDictionary<int, HotkeyRegistrationInfo> _pendingRegistrations = new();
     private readonly ConcurrentDictionary<int, TaskCompletionSource<bool>> _pendingUnregistrations = new();
+    private readonly ConcurrentDictionary<int, HotkeyRegistrationException> _registrationFailures = new();
     
     private Thread? _messageLoopThread;
     private volatile bool _isRunning = false;
@@ -164,10 +165,21 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         // Wait for registration to complete (with timeout)
         var registrationTimeout = TimeSpan.FromSeconds(5);
         var registrationStart = DateTime.UtcNow;
-        while (!_registeredHotkeys.ContainsKey(hotkeyId) && 
+        while (!_registeredHotkeys.ContainsKey(hotkeyId) &&
+               !_registrationFailures.ContainsKey(hotkeyId) &&
                DateTime.UtcNow - registrationStart < registrationTimeout)
         {
             await Task.Delay(10);
+        }
+
+        // If message-loop reported a failure, throw it (instead of timing out).
+        if (_registrationFailures.TryRemove(hotkeyId, out var registrationFailure))
+        {
+            lock (_lockObject)
+            {
+                _pendingRegistrations.TryRemove(hotkeyId, out _);
+            }
+            throw registrationFailure;
         }
 
         if (!_registeredHotkeys.ContainsKey(hotkeyId))
@@ -570,10 +582,13 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
                         }
                     }
                     
-                    // IMPORTANT: Registration failed, but RegisterHotkeyAsync is waiting for _registeredHotkeys.ContainsKey(hotkeyId)
-                    // We need to ensure the pending registration is removed so the async method can throw an exception
-                    // The pending registration is already removed by TryRemove above, so we're good
-                    // But we should NOT add it to _registeredHotkeys, which is correct
+                    // IMPORTANT:
+                    // RegisterHotkeyAsync is waiting for either a success signal (_registeredHotkeys contains ID)
+                    // or a failure signal (_registrationFailures contains ID). Record the failure to avoid timeouts.
+                    _registrationFailures[registrationInfo.HotkeyId] = new HotkeyRegistrationException(
+                        $"Failed to register hotkey {registrationInfo.Hotkey}: {errorMessage}",
+                        registrationInfo.Hotkey,
+                        (int)error);
                     return;
                 }
 

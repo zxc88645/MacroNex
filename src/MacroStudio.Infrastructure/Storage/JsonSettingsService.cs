@@ -33,6 +33,7 @@ public sealed class JsonSettingsService : ISettingsService
 
             var json = await File.ReadAllTextAsync(_settingsPath);
             var settings = JsonSerializer.Deserialize<AppSettings>(json, _options) ?? AppSettings.Default();
+            settings.EnsureDefaults();
             return settings;
         }
         catch (Exception ex)
