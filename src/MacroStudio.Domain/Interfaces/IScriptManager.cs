@@ -56,6 +56,16 @@ public interface IScriptManager
     Task<Script> DuplicateScriptAsync(Guid id, string? newName = null);
 
     /// <summary>
+    /// Renames an existing script.
+    /// </summary>
+    /// <param name="id">The unique identifier of the script to rename.</param>
+    /// <param name="newName">The new name for the script.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <exception cref="ArgumentException">Thrown when the new name is null, empty, or whitespace.</exception>
+    /// <exception cref="InvalidOperationException">Thrown when the script does not exist or the new name is already in use.</exception>
+    Task RenameScriptAsync(Guid id, string newName);
+
+    /// <summary>
     /// Validates that a script name is unique and meets naming requirements.
     /// </summary>
     /// <param name="name">The name to validate.</param>

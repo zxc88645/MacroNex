@@ -358,6 +358,44 @@ public class ScriptManager : IScriptManager
     }
 
     /// <inheritdoc />
+    public async Task RenameScriptAsync(Guid id, string newName)
+    {
+        if (string.IsNullOrWhiteSpace(newName))
+            throw new ArgumentException("Script name cannot be null or empty.", nameof(newName));
+
+        try
+        {
+            _logger.LogDebug("Renaming script {ScriptId} to '{NewName}'", id, newName);
+
+            var script = await GetScriptAsync(id);
+            if (script == null)
+            {
+                throw new InvalidOperationException($"Script with ID {id} does not exist.");
+            }
+
+            // Ensure the new name is valid and unique, excluding the script being renamed.
+            var isValidName = await IsValidScriptNameAsync(newName, excludeId: id);
+            if (!isValidName)
+            {
+                throw new InvalidOperationException($"A script with the name '{newName}' already exists.");
+            }
+
+            script.Name = newName.Trim();
+
+            // Reuse the existing update pipeline so validation, persistence, cache,
+            // and hotkey mappings all stay consistent.
+            await UpdateScriptAsync(script);
+
+            _logger.LogInformation("Renamed script {ScriptId} to '{NewName}'", id, script.Name);
+        }
+        catch (Exception ex) when (!(ex is ArgumentException || ex is InvalidOperationException))
+        {
+            _logger.LogError(ex, "Error renaming script {ScriptId} to '{NewName}'", id, newName);
+            throw;
+        }
+    }
+
+    /// <inheritdoc />
     public async Task<bool> IsValidScriptNameAsync(string name, Guid? excludeId = null)
     {
         if (string.IsNullOrWhiteSpace(name))
