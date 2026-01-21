@@ -20,7 +20,8 @@ public class UiResponsivenessPropertyTests
         var input = new FakeInputSimulator();
         var hotkeys = new FakeGlobalHotkeyService();
         var safety = new SafetyService(NullLogger<SafetyService>.Instance);
-        var exec = new ExecutionService(input, hotkeys, safety, NullLogger<ExecutionService>.Instance);
+        var lua = new LuaScriptRunner(input, safety, NullLogger<LuaScriptRunner>.Instance);
+        var exec = new ExecutionService(input, hotkeys, safety, lua, NullLogger<ExecutionService>.Instance);
 
         // attach handlers that throw - service should swallow in its raise methods
         exec.StateChanged += (_, _) => throw new InvalidOperationException("boom");
@@ -76,7 +77,9 @@ public class UiResponsivenessPropertyTests
 
     private sealed class FakeGlobalHotkeyService : IGlobalHotkeyService
     {
+#pragma warning disable CS0067 // Event is part of interface contract; not used in this test double.
         public event EventHandler<HotkeyPressedEventArgs>? HotkeyPressed;
+#pragma warning restore CS0067
         public Task RegisterHotkeyAsync(HotkeyDefinition hotkey) => Task.CompletedTask;
         public Task UnregisterHotkeyAsync(HotkeyDefinition hotkey) => Task.CompletedTask;
         public Task UnregisterAllHotkeysAsync() => Task.CompletedTask;

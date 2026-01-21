@@ -67,7 +67,9 @@ public class ImportExportAndSettingsIntegrationTests
 
     private sealed class NoopScriptHotkeyHookService : IScriptHotkeyHookService
     {
+#pragma warning disable CS0067 // Event is part of interface contract; not used in this test double.
         public event EventHandler<HotkeyPressedEventArgs>? HotkeyPressed;
+#pragma warning restore CS0067
         public void SetScriptHotkeys(IReadOnlyDictionary<Guid, HotkeyDefinition> hotkeys) { }
     }
 }

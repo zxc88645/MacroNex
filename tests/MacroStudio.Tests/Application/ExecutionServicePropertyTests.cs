@@ -28,7 +28,8 @@ public class ExecutionServicePropertyTests
         var inputSimulator = new FakeInputSimulator();
         var hotkeys = new FakeGlobalHotkeyService();
         var safety = new SafetyService(NullLogger<SafetyService>.Instance);
-        var service = new ExecutionService(inputSimulator, hotkeys, safety, logger);
+        var lua = new LuaScriptRunner(inputSimulator, safety, NullLogger<LuaScriptRunner>.Instance);
+        var service = new ExecutionService(inputSimulator, hotkeys, safety, lua, logger);
 
         var script = CreateScript(name, count);
         var options = ExecutionOptions.Debug();
@@ -103,7 +104,8 @@ public class ExecutionServicePropertyTests
         var inputSimulator = new FakeInputSimulator();
         var hotkeys = new FakeGlobalHotkeyService();
         var safety = new SafetyService(NullLogger<SafetyService>.Instance);
-        var service = new ExecutionService(inputSimulator, hotkeys, safety, logger);
+        var lua = new LuaScriptRunner(inputSimulator, safety, NullLogger<LuaScriptRunner>.Instance);
+        var service = new ExecutionService(inputSimulator, hotkeys, safety, lua, logger);
 
         // 創建一個有足夠命令的腳本，確保執行時間足夠長
         var script = CreateScript(name, 10);
@@ -177,7 +179,8 @@ public class ExecutionServicePropertyTests
         var inputSimulator = new FakeInputSimulator();
         var hotkeys = new FakeGlobalHotkeyService();
         var safety = new SafetyService(NullLogger<SafetyService>.Instance);
-        var service = new ExecutionService(inputSimulator, hotkeys, safety, logger);
+        var lua = new LuaScriptRunner(inputSimulator, safety, NullLogger<LuaScriptRunner>.Instance);
+        var service = new ExecutionService(inputSimulator, hotkeys, safety, lua, logger);
 
         var script1 = CreateScript(name1, 3);
         var script2 = CreateScript(name2, 3);
