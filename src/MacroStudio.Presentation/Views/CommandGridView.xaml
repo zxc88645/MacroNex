@@ -15,7 +15,10 @@
             <DockPanel DockPanel.Dock="Top" Margin="0,0,0,8">
                 <TextBlock FontWeight="SemiBold" Text="{DynamicResource Ui.Editor.Title}" />
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button Content="{DynamicResource Ui.Editor.ApplyScript}" Margin="0,0,8,0" Style="{DynamicResource PrimaryButton}" Command="{Binding CommandGrid.ApplyScriptTextCommand}"/>
+                    <TextBlock Margin="0,0,10,0"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource TextMutedBrush}"
+                               Text="{Binding CommandGrid.EditorStatusText}" />
                     <Button Content="{DynamicResource Ui.Editor.AddSleep}" Margin="0,0,8,0" Command="{Binding CommandGrid.AddSleepCommandCommand}"/>
                     <Button Content="{DynamicResource Ui.Editor.AddMove}" Margin="0,0,8,0" Command="{Binding CommandGrid.AddMouseMoveCommand}"/>
                     <Button x:Name="AddMouseButton"

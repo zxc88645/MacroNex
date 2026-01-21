@@ -52,6 +52,8 @@
   <sys:String x:Key="Ui.Recording.FilterInjectedSystemEvents">過濾注入/系統事件</sys:String>
   <sys:String x:Key="Ui.Recording.RecordedCountFormat">已錄製：{0}</sys:String>
   <sys:String x:Key="Ui.Recording.SaveAsScript">另存為腳本</sys:String>
+  <sys:String x:Key="Ui.Recording.InsertIntoEditor">插入到編輯區</sys:String>
+  <sys:String x:Key="Ui.Recording.CopyScript">複製腳本</sys:String>
 
   <!-- Countdown -->
   <sys:String x:Key="Ui.Countdown.FocusWarningTitle">焦點提醒</sys:String>
@@ -70,7 +72,6 @@
 
   <!-- Script editor -->
   <sys:String x:Key="Ui.Editor.Title">腳本編輯器</sys:String>
-  <sys:String x:Key="Ui.Editor.ApplyScript">套用腳本</sys:String>
   <sys:String x:Key="Ui.Editor.AddSleep">新增延遲</sys:String>
   <sys:String x:Key="Ui.Editor.AddMove">新增移動</sys:String>
   <sys:String x:Key="Ui.Editor.AddMouse">新增滑鼠</sys:String>

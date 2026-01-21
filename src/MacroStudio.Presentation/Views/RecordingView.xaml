@@ -44,10 +44,20 @@
                     <TextBlock Foreground="{DynamicResource TextMutedBrush}"
                                VerticalAlignment="Center"
                                Text="{Binding Recording.TotalCommands, Converter={StaticResource ResourceFormatConverter}, ConverterParameter=Ui.Recording.RecordedCountFormat}" />
-                    <Button DockPanel.Dock="Right"
-                            Content="{DynamicResource Ui.Recording.SaveAsScript}"
-                            Style="{DynamicResource PrimaryButton}"
-                            Command="{Binding Recording.SaveAsScriptCommand}" />
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <Button Content="←"
+                                Width="28"
+                                Margin="0,0,8,0"
+                                ToolTip="{DynamicResource Ui.Recording.InsertIntoEditor}"
+                                Command="{Binding Recording.InsertRecordedIntoEditorCommand}" />
+                        <Button Content="{DynamicResource Ui.Recording.CopyScript}"
+                                Margin="0,0,8,0"
+                                ToolTip="{DynamicResource Ui.Recording.CopyScript}"
+                                Command="{Binding Recording.CopyCurrentScriptTextCommand}" />
+                        <Button Content="{DynamicResource Ui.Recording.SaveAsScript}"
+                                Style="{DynamicResource PrimaryButton}"
+                                Command="{Binding Recording.SaveAsScriptCommand}" />
+                    </StackPanel>
                 </DockPanel>
             </StackPanel>
 

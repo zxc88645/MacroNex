@@ -9,6 +9,11 @@ using MacroStudio.Domain.ValueObjects;
 using MacroStudio.Presentation.SyntaxHighlighting;
 using MacroStudio.Presentation.Views;
 using System.Collections.ObjectModel;
+using MoonSharp.Interpreter;
+using LuaScript = MoonSharp.Interpreter.Script;
+using Script = MacroStudio.Domain.Entities.Script;
+using System.Windows.Threading;
+using Point = MacroStudio.Domain.ValueObjects.Point;
 
 namespace MacroStudio.Presentation.ViewModels;
 
@@ -22,6 +27,8 @@ public partial class CommandGridViewModel : ObservableObject
     private readonly IInputSimulator _inputSimulator;
     private bool _isUpdatingDocument;
     private string _originalScriptText = string.Empty;
+    private readonly DispatcherTimer _autoSaveTimer;
+    private int _pendingVersion;
 
     public ObservableCollection<Command> Commands { get; } = new();
 
@@ -44,6 +51,23 @@ public partial class CommandGridViewModel : ObservableObject
     [ObservableProperty]
     private bool hasUnsavedChanges;
 
+    [ObservableProperty]
+    private string editorStatusText = string.Empty;
+
+    public event EventHandler? DiagnosticsChanged;
+
+    [ObservableProperty]
+    private bool hasDiagnostic;
+
+    [ObservableProperty]
+    private int diagnosticLine;
+
+    [ObservableProperty]
+    private int diagnosticColumn;
+
+    [ObservableProperty]
+    private string? diagnosticMessage;
+
     /// <summary>
     /// Gets the AvalonEdit document for the script text.
     /// </summary>
@@ -64,6 +88,12 @@ public partial class CommandGridViewModel : ObservableObject
         Document.TextChanged += OnDocumentTextChanged;
         
         SyntaxHighlighting = MacroScriptSyntaxMode.GetHighlightingDefinition();
+
+        _autoSaveTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(650)
+        };
+        _autoSaveTimer.Tick += OnAutoSaveTimerTick;
     }
 
     public void LoadScript(Script? script)
@@ -77,7 +107,8 @@ public partial class CommandGridViewModel : ObservableObject
             _originalScriptText = string.Empty;
             HasUnsavedChanges = false;
             _isUpdatingDocument = false;
-            ApplyScriptTextCommand.NotifyCanExecuteChanged();
+            SetDiagnostic(null, 0, 0);
+            EditorStatusText = string.Empty;
             return;
         }
         
@@ -95,7 +126,8 @@ public partial class CommandGridViewModel : ObservableObject
         _originalScriptText = text;
         HasUnsavedChanges = false;
         _isUpdatingDocument = false;
-        ApplyScriptTextCommand.NotifyCanExecuteChanged();
+        SetDiagnostic(null, 0, 0);
+        EditorStatusText = string.Empty;
     }
 
     private void OnDocumentTextChanged(object? sender, EventArgs e)
@@ -106,7 +138,13 @@ public partial class CommandGridViewModel : ObservableObject
         
         // Check if text has changed from original
         HasUnsavedChanges = CurrentScript != null && Document.Text != _originalScriptText;
-        ApplyScriptTextCommand.NotifyCanExecuteChanged();
+        if (HasUnsavedChanges)
+            EditorStatusText = "Unsaved";
+
+        // Debounced validate + autosave on UI thread (more reliable than Task.Run + dispatcher hops).
+        _pendingVersion++;
+        _autoSaveTimer.Stop();
+        _autoSaveTimer.Start();
     }
 
     [RelayCommand(CanExecute = nameof(HasScript))]
@@ -182,29 +220,7 @@ public partial class CommandGridViewModel : ObservableObject
         RemoveLastNonEmptyLine();
     }
 
-    [RelayCommand(CanExecute = nameof(CanApplyScript))]
-    private async Task ApplyScriptTextAsync()
-    {
-        if (CurrentScript == null) return;
-
-        try
-        {
-            CurrentScript.SourceText = Document.Text ?? string.Empty;
-            await PersistAndReloadAsync("Updated script source");
-        }
-        catch (Exception ex)
-        {
-            await _loggingService.LogErrorAsync("Failed to parse script text", ex, new Dictionary<string, object>
-            {
-                { "ScriptId", CurrentScript.Id },
-                { "ScriptName", CurrentScript.Name }
-            });
-        }
-    }
-
     private bool HasScript() => CurrentScript != null;
-    
-    private bool CanApplyScript() => CurrentScript != null && HasUnsavedChanges;
 
     private async Task<bool> TryApplyScriptTextInternalAsync()
     {
@@ -259,7 +275,6 @@ public partial class CommandGridViewModel : ObservableObject
         AddLeftClickCommand.NotifyCanExecuteChanged();
         AddRightClickCommand.NotifyCanExecuteChanged();
         AddMiddleClickCommand.NotifyCanExecuteChanged();
-        ApplyScriptTextCommand.NotifyCanExecuteChanged();
     }
 
     partial void OnCurrentScriptChanged(Script? oldValue, Script? newValue)
@@ -271,7 +286,6 @@ public partial class CommandGridViewModel : ObservableObject
         AddLeftClickCommand.NotifyCanExecuteChanged();
         AddRightClickCommand.NotifyCanExecuteChanged();
         AddMiddleClickCommand.NotifyCanExecuteChanged();
-        ApplyScriptTextCommand.NotifyCanExecuteChanged();
     }
 
     private async Task AddClickSequenceAsync(MouseButton button)
@@ -282,15 +296,36 @@ public partial class CommandGridViewModel : ObservableObject
 
     private void InsertSnippetAtCaret(string snippet)
     {
-        // Ensure this is a standalone line.
-        var insertion = snippet + Environment.NewLine;
+        InsertTextAtCaret(snippet, ensureStandaloneLine: true);
+    }
+
+    /// <summary>
+    /// Inserts arbitrary text into the editor at the current caret position (or replaces selection).
+    /// Intended for integrating other UI features (e.g., insert recorded script into editor).
+    /// </summary>
+    public void InsertTextAtCaret(string? text, bool ensureStandaloneLine)
+    {
+        if (string.IsNullOrEmpty(text))
+            return;
+
+        var insertion = text;
+
+        if (ensureStandaloneLine)
+        {
+            // Ensure insertion ends with a newline so subsequent typing starts on a new line.
+            if (!insertion.EndsWith("\n", StringComparison.Ordinal) &&
+                !insertion.EndsWith("\r", StringComparison.Ordinal))
+            {
+                insertion += Environment.NewLine;
+            }
+        }
 
         var doc = Document;
         var docLen = doc.TextLength;
         var caret = Math.Clamp(CaretOffset, 0, docLen);
 
         // If inserting mid-line, start on a new line first.
-        if (caret > 0)
+        if (ensureStandaloneLine && caret > 0)
         {
             var prev = doc.GetCharAt(caret - 1);
             if (prev != '\n' && prev != '\r')
@@ -314,6 +349,136 @@ public partial class CommandGridViewModel : ObservableObject
     }
 
     private static string EscapeSingleQuotes(string text) => text.Replace("'", "\\'");
+
+    private async void OnAutoSaveTimerTick(object? sender, EventArgs e)
+    {
+        _autoSaveTimer.Stop();
+
+        var version = _pendingVersion;
+
+        // 1) Validate first (so we don't auto-save invalid scripts)
+        await ValidateLuaSyntaxAsync(CancellationToken.None);
+        if (version != _pendingVersion)
+            return;
+
+        // 2) Auto-save
+        await AutoSaveAsync(version, CancellationToken.None);
+    }
+
+    private async Task AutoSaveAsync(int version, CancellationToken ct)
+    {
+        if (CurrentScript == null)
+            return;
+
+        if (!HasUnsavedChanges)
+            return;
+
+        if (HasDiagnostic)
+        {
+            EditorStatusText = "Syntax error";
+            return;
+        }
+
+        try
+        {
+            EditorStatusText = "Saving…";
+            CurrentScript.SourceText = Document.Text ?? string.Empty;
+            await _scriptManager.UpdateScriptAsync(CurrentScript);
+
+            if (version != _pendingVersion)
+                return;
+
+            _originalScriptText = CurrentScript.SourceText;
+            HasUnsavedChanges = false;
+            EditorStatusText = "Saved";
+        }
+        catch (Exception ex)
+        {
+            EditorStatusText = "Save failed";
+            await _loggingService.LogErrorAsync("Auto-save failed", ex, new Dictionary<string, object>
+            {
+                { "ScriptId", CurrentScript.Id },
+                { "ScriptName", CurrentScript.Name }
+            });
+        }
+    }
+
+    private async Task ValidateLuaSyntaxAsync(CancellationToken ct)
+    {
+        if (CurrentScript == null)
+        {
+            SetDiagnostic(null, 0, 0);
+            return;
+        }
+
+        var code = Document.Text ?? string.Empty;
+        if (string.IsNullOrWhiteSpace(code))
+        {
+            SetDiagnostic(null, 0, 0);
+            return;
+        }
+
+        try
+        {
+            var lua = new LuaScript(CoreModules.Basic | CoreModules.String | CoreModules.Table | CoreModules.Math);
+            lua.LoadString(code);
+            SetDiagnostic(null, 0, 0);
+        }
+        catch (SyntaxErrorException ex)
+        {
+            var (line, col) = TryParseLineCol(ex.DecoratedMessage);
+            SetDiagnostic(ex.DecoratedMessage, line, col);
+        }
+        catch (Exception ex)
+        {
+            SetDiagnostic(ex.Message, 0, 0);
+        }
+
+        await Task.CompletedTask;
+    }
+
+    private void SetDiagnostic(string? message, int line, int column)
+    {
+        // If we have a message but no location, mark line 1 so UI still shows a highlight.
+        if (!string.IsNullOrWhiteSpace(message) && line <= 0)
+        {
+            line = 1;
+            column = 1;
+        }
+
+        DiagnosticMessage = message;
+        DiagnosticLine = line;
+        DiagnosticColumn = column;
+        HasDiagnostic = !string.IsNullOrWhiteSpace(message);
+        DiagnosticsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static (int line, int col) TryParseLineCol(string? msg)
+    {
+        if (string.IsNullOrEmpty(msg))
+            return (0, 0);
+
+        var lineIdx = msg.IndexOf("line ", StringComparison.OrdinalIgnoreCase);
+        if (lineIdx >= 0)
+        {
+            var after = msg[(lineIdx + 5)..];
+            var parts = after.Split(new[] { ' ', '\r', '\n', '\t', ',', ')' }, StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length > 0 && int.TryParse(parts[0], out var line))
+            {
+                var colIdx = msg.IndexOf("col ", StringComparison.OrdinalIgnoreCase);
+                if (colIdx >= 0)
+                {
+                    var afterCol = msg[(colIdx + 4)..];
+                    var colParts = afterCol.Split(new[] { ' ', '\r', '\n', '\t', ',', ')' }, StringSplitOptions.RemoveEmptyEntries);
+                    if (colParts.Length > 0 && int.TryParse(colParts[0], out var col))
+                        return (line, col);
+                }
+                return (line, 1);
+            }
+        }
+
+        return (0, 0);
+    }
 
     private void RemoveLastNonEmptyLine()
     {

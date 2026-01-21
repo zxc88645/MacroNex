@@ -52,6 +52,8 @@
   <sys:String x:Key="Ui.Recording.FilterInjectedSystemEvents">Filter injected/system events</sys:String>
   <sys:String x:Key="Ui.Recording.RecordedCountFormat">Recorded: {0}</sys:String>
   <sys:String x:Key="Ui.Recording.SaveAsScript">Save as Script</sys:String>
+  <sys:String x:Key="Ui.Recording.InsertIntoEditor">Insert recorded into editor</sys:String>
+  <sys:String x:Key="Ui.Recording.CopyScript">Copy script</sys:String>
 
   <!-- Countdown -->
   <sys:String x:Key="Ui.Countdown.FocusWarningTitle">Focus Warning</sys:String>
@@ -70,7 +72,6 @@
 
   <!-- Script editor -->
   <sys:String x:Key="Ui.Editor.Title">Script Editor</sys:String>
-  <sys:String x:Key="Ui.Editor.ApplyScript">Apply Script</sys:String>
   <sys:String x:Key="Ui.Editor.AddSleep">Add Sleep</sys:String>
   <sys:String x:Key="Ui.Editor.AddMove">Add Move</sys:String>
   <sys:String x:Key="Ui.Editor.AddMouse">Add Mouse</sys:String>

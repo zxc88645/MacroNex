@@ -4,11 +4,13 @@ using MacroStudio.Domain.Entities;
 using MacroStudio.Domain.Events;
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
+using MacroStudio.Application.Services;
 using MacroStudio.Presentation.Views;
 using MacroStudio.Presentation.Utilities;
 using System.Collections.ObjectModel;
 using System.Collections.Generic;
 using System.Linq;
+using System.Windows;
 
 namespace MacroStudio.Presentation.ViewModels;
 
@@ -21,6 +23,7 @@ public partial class RecordingViewModel : ObservableObject
     private readonly IScriptManager _scriptManager;
     private readonly ILoggingService _loggingService;
     private readonly ScriptListViewModel _scriptListViewModel;
+    private readonly CommandGridViewModel _commandGridViewModel;
 
     public ObservableCollection<Command> RecordedCommands { get; } = new();
 
@@ -46,12 +49,14 @@ public partial class RecordingViewModel : ObservableObject
         IRecordingService recordingService,
         IScriptManager scriptManager,
         ILoggingService loggingService,
-        ScriptListViewModel scriptListViewModel)
+        ScriptListViewModel scriptListViewModel,
+        CommandGridViewModel commandGridViewModel)
     {
         _recordingService = recordingService ?? throw new ArgumentNullException(nameof(recordingService));
         _scriptManager = scriptManager ?? throw new ArgumentNullException(nameof(scriptManager));
         _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
         _scriptListViewModel = scriptListViewModel ?? throw new ArgumentNullException(nameof(scriptListViewModel));
+        _commandGridViewModel = commandGridViewModel ?? throw new ArgumentNullException(nameof(commandGridViewModel));
 
         _recordingService.CommandRecorded += OnCommandRecorded;
         _recordingService.RecordingStateChanged += OnRecordingStateChanged;
@@ -87,6 +92,47 @@ public partial class RecordingViewModel : ObservableObject
         };
     }
 
+    [RelayCommand(CanExecute = nameof(CanInsertRecordedIntoEditor))]
+    private void InsertRecordedIntoEditor()
+    {
+        try
+        {
+            if (RecordedCommands.Count == 0)
+                return;
+
+            // Convert recorded commands to Lua/text and insert at current editor caret.
+            var temp = new Script("RecordedTemp");
+            foreach (var cmd in RecordedCommands)
+                temp.AddCommand(cmd.Clone());
+
+            var text = ScriptTextConverter.ToText(temp);
+            _commandGridViewModel.InsertTextAtCaret(text, ensureStandaloneLine: true);
+        }
+        catch (Exception ex)
+        {
+            _ = _loggingService.LogErrorAsync("Failed to insert recorded script into editor", ex);
+        }
+    }
+
+    private bool CanInsertRecordedIntoEditor() => RecordedCommands.Count > 0;
+
+    [RelayCommand]
+    private void CopyCurrentScriptText()
+    {
+        try
+        {
+            var text = _commandGridViewModel.Document.Text ?? string.Empty;
+            if (string.IsNullOrWhiteSpace(text))
+                return;
+
+            Clipboard.SetText(text);
+        }
+        catch (Exception ex)
+        {
+            _ = _loggingService.LogErrorAsync("Failed to copy script text to clipboard", ex);
+        }
+    }
+
     [RelayCommand(CanExecute = nameof(CanStartRecording))]
     private async Task StartRecordingAsync()
     {
@@ -101,6 +147,7 @@ public partial class RecordingViewModel : ObservableObject
 
             RecordedCommands.Clear();
             TotalCommands = 0;
+            InsertRecordedIntoEditorCommand.NotifyCanExecuteChanged();
 
             var options = new RecordingOptions
             {
@@ -124,6 +171,7 @@ public partial class RecordingViewModel : ObservableObject
             PauseRecordingCommand.NotifyCanExecuteChanged();
             ResumeRecordingCommand.NotifyCanExecuteChanged();
             SaveAsScriptCommand.NotifyCanExecuteChanged();
+            InsertRecordedIntoEditorCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(PauseButtonText));
         }
     }
@@ -150,6 +198,7 @@ public partial class RecordingViewModel : ObservableObject
             PauseRecordingCommand.NotifyCanExecuteChanged();
             ResumeRecordingCommand.NotifyCanExecuteChanged();
             SaveAsScriptCommand.NotifyCanExecuteChanged();
+            InsertRecordedIntoEditorCommand.NotifyCanExecuteChanged();
         }
     }
 
@@ -185,6 +234,7 @@ public partial class RecordingViewModel : ObservableObject
             PauseRecordingCommand.NotifyCanExecuteChanged();
             ResumeRecordingCommand.NotifyCanExecuteChanged();
             SaveAsScriptCommand.NotifyCanExecuteChanged();
+            InsertRecordedIntoEditorCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(PauseButtonText));
         }
     }
@@ -213,6 +263,7 @@ public partial class RecordingViewModel : ObservableObject
             PauseRecordingCommand.NotifyCanExecuteChanged();
             ResumeRecordingCommand.NotifyCanExecuteChanged();
             SaveAsScriptCommand.NotifyCanExecuteChanged();
+            InsertRecordedIntoEditorCommand.NotifyCanExecuteChanged();
             OnPropertyChanged(nameof(PauseButtonText));
         }
     }
@@ -253,6 +304,9 @@ public partial class RecordingViewModel : ObservableObject
         foreach (var cmd in RecordedCommands)
             script.AddCommand(cmd.Clone());
 
+        // Persist a Lua/text representation too, so recorded scripts keep real timing (msleep calls).
+        script.SourceText = ScriptTextConverter.ToText(script);
+
         await _scriptManager.UpdateScriptAsync(script);
 
         await _scriptListViewModel.RefreshAsync();
@@ -280,6 +334,7 @@ public partial class RecordingViewModel : ObservableObject
         {
             RecordedCommands.Add(cloned);
             TotalCommands = RecordedCommands.Count;
+            InsertRecordedIntoEditorCommand.NotifyCanExecuteChanged();
         });
     }
 
