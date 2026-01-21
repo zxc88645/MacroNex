@@ -18,6 +18,12 @@ public interface IInputSimulator
     Task SimulateMouseMoveAsync(Point position);
 
     /// <summary>
+    /// Simulates moving the mouse cursor to the specified position using a lower-level injected method (e.g., SendInput).
+    /// This can work better in some games than direct cursor positioning.
+    /// </summary>
+    Task SimulateMouseMoveLowLevelAsync(Point position);
+
+    /// <summary>
     /// Simulates a mouse click action using the current cursor position.
     /// </summary>
     /// <param name="button">The mouse button to click.</param>

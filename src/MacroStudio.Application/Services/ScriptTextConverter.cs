@@ -31,6 +31,9 @@ public static class ScriptTextConverter
                 case MouseMoveCommand move:
                     sb.AppendLine($"move({move.Position.X}, {move.Position.Y})");
                     break;
+                case MouseMoveLowLevelCommand moveLl:
+                    sb.AppendLine($"move_ll({moveLl.Position.X}, {moveLl.Position.Y})");
+                    break;
 
                 case MouseClickCommand click:
                     var buttonName = ToButtonName(click.Button);
@@ -138,6 +141,11 @@ public static class ScriptTextConverter
                 {
                     var ms = ParseSingleDoubleArg(codePart, "msleep");
                     commands.Add(new SleepCommand(TimeSpan.FromMilliseconds(ms)));
+                }
+                else if (codePart.StartsWith("move_ll", StringComparison.OrdinalIgnoreCase))
+                {
+                    var (x, y) = ParseTwoIntArgs(codePart, "move_ll");
+                    commands.Add(new MouseMoveLowLevelCommand(new Point(x, y)));
                 }
                 else if (codePart.StartsWith("move", StringComparison.OrdinalIgnoreCase))
                 {

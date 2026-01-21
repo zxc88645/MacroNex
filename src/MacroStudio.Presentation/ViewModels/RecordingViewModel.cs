@@ -34,6 +34,9 @@ public partial class RecordingViewModel : ObservableObject
     private bool recordMouseMovements = true;
 
     [ObservableProperty]
+    private bool useLowLevelMouseMove = false;
+
+    [ObservableProperty]
     private bool recordMouseClicks = true;
 
     [ObservableProperty]
@@ -154,7 +157,8 @@ public partial class RecordingViewModel : ObservableObject
                 RecordMouseMovements = RecordMouseMovements,
                 RecordMouseClicks = RecordMouseClicks,
                 RecordKeyboardInput = RecordKeyboardInput,
-                FilterSystemEvents = FilterSystemEvents
+                FilterSystemEvents = FilterSystemEvents,
+                UseLowLevelMouseMove = UseLowLevelMouseMove
             };
 
             await _recordingService.StartRecordingAsync(options);

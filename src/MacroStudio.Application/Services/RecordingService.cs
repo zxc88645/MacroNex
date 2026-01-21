@@ -453,7 +453,7 @@ public class RecordingService : IRecordingService
         var stats = new RecordingStatistics
         {
             TotalCommands = commands.Count,
-            MouseMoveCommands = commands.Count(c => c is MouseMoveCommand),
+            MouseMoveCommands = commands.Count(c => c is MouseMoveCommand || c is MouseMoveLowLevelCommand),
             MouseClickCommands = commands.Count(c => c is MouseClickCommand),
             KeyboardCommands = commands.Count(c => c is KeyboardCommand),
             SleepCommands = commands.Count(c => c is SleepCommand),
@@ -523,10 +523,10 @@ public class RecordingService : IRecordingService
                 return;
             }
 
-            var command = new MouseMoveCommand(position)
-            {
-                Delay = delay
-            };
+            Command command = session.Options.UseLowLevelMouseMove
+                ? new MouseMoveLowLevelCommand(position)
+                : new MouseMoveCommand(position);
+            command.Delay = delay;
 
             session.AddCommand(command);
             _lastEventTime = now;

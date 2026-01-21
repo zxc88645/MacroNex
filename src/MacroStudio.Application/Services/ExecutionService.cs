@@ -668,6 +668,9 @@ public sealed class ExecutionService : IExecutionService, IDisposable
                 case MouseMoveCommand mm:
                     await _inputSimulator.SimulateMouseMoveAsync(mm.Position);
                     break;
+                    case MouseMoveLowLevelCommand mmll:
+                        await _inputSimulator.SimulateMouseMoveLowLevelAsync(mmll.Position);
+                        break;
                 case MouseClickCommand mc:
                     await _inputSimulator.SimulateMouseClickAsync(mc.Button, mc.Type);
                     break;

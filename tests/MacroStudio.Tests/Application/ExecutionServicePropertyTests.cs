@@ -257,6 +257,7 @@ public class ExecutionServicePropertyTests
     private sealed class FakeInputSimulator : IInputSimulator
     {
         public Task SimulateMouseMoveAsync(Point position) => Task.CompletedTask;
+        public Task SimulateMouseMoveLowLevelAsync(Point position) => Task.CompletedTask;
 
         public Task SimulateMouseClickAsync(MouseButton button, ClickType type) => Task.CompletedTask;
 

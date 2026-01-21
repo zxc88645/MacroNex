@@ -54,6 +54,26 @@ public class Win32InputSimulator : IInputSimulator
     }
 
     /// <inheritdoc />
+    public async Task SimulateMouseMoveLowLevelAsync(Point position)
+    {
+        ThrowIfDisposed();
+        ValidatePosition(position);
+
+        _logger.LogDebug("Simulating low-level mouse move to {Position}", position);
+
+        await Task.Run(() =>
+        {
+            lock (_lockObject)
+            {
+                // SendInput absolute move (normalized 0..65535). Some games accept this better than SetCursorPos.
+                var input = CreateAbsoluteMouseMoveInput(position);
+                SendInputs(new[] { input });
+                _logger.LogTrace("Successfully sent low-level move to {Position}", position);
+            }
+        });
+    }
+
+    /// <inheritdoc />
     public async Task SimulateMouseClickAsync(MouseButton button, ClickType type)
     {
         ThrowIfDisposed();
@@ -361,6 +381,39 @@ public class Win32InputSimulator : IInputSimulator
                     dy = 0,
                     mouseData = mouseData,
                     dwFlags = flags,
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero
+                }
+            }
+        };
+    }
+
+    private INPUT CreateAbsoluteMouseMoveInput(Point position)
+    {
+        var screenWidth = GetSystemMetrics(SM_CXSCREEN);
+        var screenHeight = GetSystemMetrics(SM_CYSCREEN);
+
+        // Normalize to 0..65535. Use (size-1) per Win32 docs to map full range.
+        var maxX = Math.Max(1, screenWidth - 1);
+        var maxY = Math.Max(1, screenHeight - 1);
+
+        var x = Math.Clamp(position.X, 0, maxX);
+        var y = Math.Clamp(position.Y, 0, maxY);
+
+        var dx = (int)Math.Round(x * 65535.0 / maxX, MidpointRounding.AwayFromZero);
+        var dy = (int)Math.Round(y * 65535.0 / maxY, MidpointRounding.AwayFromZero);
+
+        return new INPUT
+        {
+            type = INPUT_MOUSE,
+            u = new InputUnion
+            {
+                mi = new MOUSEINPUT
+                {
+                    dx = dx,
+                    dy = dy,
+                    mouseData = 0,
+                    dwFlags = MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE,
                     time = 0,
                     dwExtraInfo = IntPtr.Zero
                 }

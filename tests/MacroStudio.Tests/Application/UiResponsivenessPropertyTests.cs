@@ -92,6 +92,7 @@ public class UiResponsivenessPropertyTests
     private sealed class FakeInputSimulator : IInputSimulator
     {
         public Task SimulateMouseMoveAsync(Point position) => Task.CompletedTask;
+        public Task SimulateMouseMoveLowLevelAsync(Point position) => Task.CompletedTask;
         public Task SimulateMouseClickAsync(MouseButton button, ClickType type) => Task.CompletedTask;
         public Task SimulateKeyboardInputAsync(string text) => Task.CompletedTask;
         public Task SimulateKeyPressAsync(VirtualKey key, bool isKeyDown) => Task.CompletedTask;

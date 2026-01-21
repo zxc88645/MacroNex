@@ -58,6 +58,12 @@ public sealed class LuaScriptRunner
             _inputSimulator.SimulateMouseMoveAsync(new Point(x, y)).GetAwaiter().GetResult();
         });
 
+        script.Globals["move_ll"] = (Action<int, int>)((x, y) =>
+        {
+            ct.ThrowIfCancellationRequested();
+            _inputSimulator.SimulateMouseMoveLowLevelAsync(new Point(x, y)).GetAwaiter().GetResult();
+        });
+
         script.Globals["type_text"] = (Action<string>)(text =>
         {
             ct.ThrowIfCancellationRequested();
