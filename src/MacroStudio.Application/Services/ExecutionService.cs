@@ -184,6 +184,11 @@ public sealed class ExecutionService : IExecutionService, IDisposable
                 throw new InvalidOperationException("No script is currently executing.");
             }
 
+            if (context.Session.Options.ControlMode != ExecutionControlMode.DebugInteractive)
+            {
+                throw new InvalidOperationException("Pause is not available for this execution mode.");
+            }
+
             if (context.State != ExecutionState.Running)
             {
                 throw new InvalidOperationException("Execution is not running.");
@@ -212,6 +217,11 @@ public sealed class ExecutionService : IExecutionService, IDisposable
             if (CurrentScript == null || !_activeExecutions.TryGetValue(CurrentScript.Id, out context))
             {
                 throw new InvalidOperationException("No script is currently paused.");
+            }
+
+            if (context.Session.Options.ControlMode != ExecutionControlMode.DebugInteractive)
+            {
+                throw new InvalidOperationException("Resume is not available for this execution mode.");
             }
 
             if (context.State != ExecutionState.Paused)
@@ -244,6 +254,11 @@ public sealed class ExecutionService : IExecutionService, IDisposable
                 State = ExecutionState.Stopped;
                 return Task.CompletedTask;
             }
+
+            if (context.Session.Options.ControlMode != ExecutionControlMode.DebugInteractive)
+            {
+                throw new InvalidOperationException("Stop is not available for this execution mode.");
+            }
         }
 
         _logger.LogInformation("Stopping execution (session {SessionId}, script {ScriptId})", context.Session.Id, context.Script.Id);
@@ -271,6 +286,11 @@ public sealed class ExecutionService : IExecutionService, IDisposable
         {
             if (CurrentScript == null)
                 throw new InvalidOperationException("No script is loaded.");
+
+            if (CurrentSession?.Options.ControlMode != ExecutionControlMode.DebugInteractive)
+            {
+                throw new InvalidOperationException("Step is not available for this execution mode.");
+            }
 
             // 如果腳本沒有在執行，創建一個臨時上下文用於單步執行
             if (!_activeExecutions.TryGetValue(CurrentScript.Id, out context))
@@ -365,7 +385,9 @@ public sealed class ExecutionService : IExecutionService, IDisposable
         if (string.IsNullOrWhiteSpace(script.Name))
             errors.Add("Script name is empty.");
 
-        if (script.CommandCount == 0)
+        // A script can be represented either as a command list OR as Lua SourceText.
+        // If both are empty, it's not executable.
+        if (script.CommandCount == 0 && string.IsNullOrWhiteSpace(script.SourceText))
             errors.Add("Script has no commands.");
 
         for (var i = 0; i < script.CommandCount; i++)
@@ -461,26 +483,90 @@ public sealed class ExecutionService : IExecutionService, IDisposable
                 await _inputSimulator.DelayAsync(session.Options.CountdownDuration);
             }
 
-            // Lua-only execution: run SourceText. For scripts created via recording,
-            // SourceText might be empty; we fall back to the old command list as a
-            // sequence of Lua function calls (which is valid Lua).
-            var source = script.SourceText;
-            if (string.IsNullOrWhiteSpace(source))
+            // Execution mode:
+            // - DebugInteractive (right-side Execution panel): always execute the command list so we can show real progress
+            //   and support pause/resume/stop/step.
+            // - RunOnly (hotkey): execute without pause/step/stop semantics. Prefer Lua SourceText when present, otherwise
+            //   fall back to command list. Progress is best-effort only.
+            if (session.Options.ControlMode == ExecutionControlMode.DebugInteractive)
             {
-                source = ScriptTextConverter.ToText(script);
+                if (script.CommandCount > 0)
+                {
+                    // Emit initial progress (0%)
+                    ProgressChanged?.Invoke(this, new ExecutionProgressEventArgs(session.Id, 0, script.CommandCount, session.ElapsedTime, CalculateRemainingTime(context)));
+
+                    for (var i = 0; i < script.CommandCount; i++)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        context.PauseEvent.Wait(ct);
+
+                        if (_safetyService.IsKillSwitchActive)
+                            throw new InvalidOperationException("Kill switch is active.");
+
+                        // Safety: max execution time (coarse guard)
+                        if (DateTime.UtcNow - started > session.Options.MaxExecutionTime)
+                            throw new InvalidOperationException("Execution time limit exceeded.");
+
+                        await ExecuteSingleCommandAsync(context, i, ct);
+                    }
+                }
+                else
+                {
+                    // DebugInteractive but no domain commands: run Lua SourceText (no step/pause granularity).
+                    var source = script.SourceText ?? string.Empty;
+                    if (string.IsNullOrWhiteSpace(source))
+                        throw new InvalidOperationException("Script has no commands.");
+
+                    // Best-effort progress: treat as a single unit of work so UI doesn't look stuck.
+                    ProgressChanged?.Invoke(this, new ExecutionProgressEventArgs(session.Id, 0, 1, session.ElapsedTime, null));
+
+                    ct.ThrowIfCancellationRequested();
+                    context.PauseEvent.Wait(ct); // allow "Pause" before start (after that it's best-effort)
+
+                    if (_safetyService.IsKillSwitchActive)
+                        throw new InvalidOperationException("Kill switch is active.");
+
+                    if (DateTime.UtcNow - started > session.Options.MaxExecutionTime)
+                        throw new InvalidOperationException("Execution time limit exceeded.");
+
+                    await _luaRunner.RunAsync(source, ct);
+                    ProgressChanged?.Invoke(this, new ExecutionProgressEventArgs(session.Id, 1, 1, session.ElapsedTime, TimeSpan.Zero));
+                }
             }
+            else
+            {
+                // Run-only: do NOT block on PauseEvent (pause/resume isn't supported here).
+                ct.ThrowIfCancellationRequested();
 
-            ct.ThrowIfCancellationRequested();
-            context.PauseEvent.Wait(ct);
+                if (_safetyService.IsKillSwitchActive)
+                    throw new InvalidOperationException("Kill switch is active.");
 
-            if (_safetyService.IsKillSwitchActive)
-                throw new InvalidOperationException("Kill switch is active.");
+                // Safety: max execution time (coarse guard; Lua runner also enforces limits)
+                if (DateTime.UtcNow - started > session.Options.MaxExecutionTime)
+                    throw new InvalidOperationException("Execution time limit exceeded.");
 
-            // Safety: max execution time (coarse guard; Lua runner also enforces limits)
-            if (DateTime.UtcNow - started > session.Options.MaxExecutionTime)
-                throw new InvalidOperationException("Execution time limit exceeded.");
+                var source = script.SourceText;
+                if (!string.IsNullOrWhiteSpace(source))
+                {
+                    await _luaRunner.RunAsync(source, ct);
+                }
+                else
+                {
+                    // Fall back to command list
+                    for (var i = 0; i < script.CommandCount; i++)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        if (_safetyService.IsKillSwitchActive)
+                            throw new InvalidOperationException("Kill switch is active.");
+                        if (DateTime.UtcNow - started > session.Options.MaxExecutionTime)
+                            throw new InvalidOperationException("Execution time limit exceeded.");
+                        await ExecuteSingleCommandAsync(context, i, ct);
+                    }
+                }
 
-            await _luaRunner.RunAsync(source, ct);
+                // Best-effort progress update at completion.
+                ProgressChanged?.Invoke(this, new ExecutionProgressEventArgs(session.Id, script.CommandCount, script.CommandCount, session.ElapsedTime, TimeSpan.Zero));
+            }
 
             lock (_lockObject)
             {

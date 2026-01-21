@@ -117,6 +117,8 @@ public partial class MainViewModel : ObservableObject
                 {
                     // Prepare execution options
                     var options = ExecutionOptions.Default();
+                    options.TriggerSource = ExecutionTriggerSource.Hotkey;
+                    options.ControlMode = ExecutionControlMode.RunOnly;
                     options.ShowCountdown = false;
                     options.CountdownDuration = TimeSpan.Zero;
 

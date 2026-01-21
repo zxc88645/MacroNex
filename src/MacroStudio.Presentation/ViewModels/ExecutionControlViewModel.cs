@@ -7,6 +7,7 @@ using MacroStudio.Domain.ValueObjects;
 using MacroStudio.Presentation.Views;
 using MacroStudio.Presentation.Utilities;
 
+
 namespace MacroStudio.Presentation.ViewModels;
 
 /// <summary>
@@ -69,6 +70,43 @@ public partial class ExecutionControlViewModel : ObservableObject
         _ = LoadDefaultsAsync();
     }
 
+    private void RunOnUiThread(Action action)
+    {
+        var dispatcher = System.Windows.Application.Current?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+            dispatcher.Invoke(action);
+        else
+            action();
+    }
+
+    /// <summary>
+    /// Best-effort: if the user is currently editing a script in the editor, sync the editor text
+    /// into the same Script instance we're about to execute. This avoids executing a stale version.
+    /// </summary>
+    private void TrySyncFromEditorIfEditingSameScript(Script script)
+    {
+        try
+        {
+            var mainVm = System.Windows.Application.Current?.MainWindow?.DataContext as MainViewModel;
+            var grid = mainVm?.CommandGrid;
+            var editing = grid?.CurrentScript;
+            if (editing == null || editing.Id != script.Id)
+                return;
+
+            // Don't sync invalid Lua text; keep last known good SourceText.
+            if (grid!.HasDiagnostic)
+                return;
+
+            // Sync the in-memory script used by execution with what the editor currently shows.
+            // (Persistence is handled by autosave; execution correctness matters more here.)
+            script.SourceText = grid.Document.Text ?? string.Empty;
+        }
+        catch
+        {
+            // Best-effort only.
+        }
+    }
+
     private async Task LoadDefaultsAsync()
     {
         var settings = await _settingsService.LoadAsync();
@@ -101,6 +139,7 @@ public partial class ExecutionControlViewModel : ObservableObject
         CompletionPercentage = 0;
         StartCommand.NotifyCanExecuteChanged();
         StepCommand.NotifyCanExecuteChanged();
+        TerminateCommand.NotifyCanExecuteChanged();
     }
 
     [RelayCommand(CanExecute = nameof(CanStart))]
@@ -108,7 +147,18 @@ public partial class ExecutionControlViewModel : ObservableObject
     {
         if (Script == null) return;
 
+        // Reset UI progress immediately so it doesn't show stale "completed" progress while starting.
+        RunOnUiThread(() =>
+        {
+            CurrentCommandIndex = 0;
+            TotalCommandCount = Script.CommandCount;
+            CompletionPercentage = 0;
+            LastError = null;
+        });
+
         var options = ExecutionOptions.Default();
+        options.TriggerSource = ExecutionTriggerSource.DebugPanel;
+        options.ControlMode = ExecutionControlMode.DebugInteractive;
         options.SpeedMultiplier = SpeedMultiplier <= 0 ? 1.0 : SpeedMultiplier;
         options.ShowCountdown = false; // UI handles countdown (focus warning)
         options.CountdownDuration = TimeSpan.Zero;
@@ -128,8 +178,24 @@ public partial class ExecutionControlViewModel : ObservableObject
             { "CountdownSeconds", CountdownDuration.TotalSeconds }
         });
 
-        await _executionService.StartExecutionAsync(Script, options);
-        RefreshFromService();
+        try
+        {
+            // Ensure we execute what the user is currently editing (not a stale cached instance).
+            TrySyncFromEditorIfEditingSameScript(Script);
+
+            await _executionService.StartExecutionAsync(Script, options);
+            RefreshFromService();
+        }
+        catch (Exception ex)
+        {
+            LastError = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
+            await _loggingService.LogErrorAsync("Start execution failed (UI)", ex, new Dictionary<string, object>
+            {
+                { "ScriptId", Script.Id },
+                { "ScriptName", Script.Name }
+            });
+            UpdateCanExecute();
+        }
     }
 
     private bool CanStart() => Script != null && (State == ExecutionState.Idle || State == ExecutionState.Stopped || State == ExecutionState.Completed || State == ExecutionState.Failed || State == ExecutionState.Terminated);
@@ -137,69 +203,143 @@ public partial class ExecutionControlViewModel : ObservableObject
     [RelayCommand(CanExecute = nameof(CanPause))]
     private async Task PauseAsync()
     {
-        await _executionService.PauseExecutionAsync();
-        RefreshFromService();
+        try
+        {
+            await _executionService.PauseExecutionAsync();
+            RefreshFromService();
+        }
+        catch (Exception ex)
+        {
+            LastError = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
+            await _loggingService.LogErrorAsync("Pause execution failed (UI)", ex);
+            UpdateCanExecute();
+        }
     }
 
-    private bool CanPause() => State == ExecutionState.Running;
+    private bool CanPause() =>
+        State == ExecutionState.Running &&
+        _executionService.CurrentSession?.Options.ControlMode == ExecutionControlMode.DebugInteractive;
 
     [RelayCommand(CanExecute = nameof(CanResume))]
     private async Task ResumeAsync()
     {
-        await _executionService.ResumeExecutionAsync();
-        RefreshFromService();
+        try
+        {
+            await _executionService.ResumeExecutionAsync();
+            RefreshFromService();
+        }
+        catch (Exception ex)
+        {
+            LastError = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
+            await _loggingService.LogErrorAsync("Resume execution failed (UI)", ex);
+            UpdateCanExecute();
+        }
     }
 
-    private bool CanResume() => State == ExecutionState.Paused;
+    private bool CanResume() =>
+        State == ExecutionState.Paused &&
+        _executionService.CurrentSession?.Options.ControlMode == ExecutionControlMode.DebugInteractive;
 
     [RelayCommand(CanExecute = nameof(CanStop))]
     private async Task StopAsync()
     {
-        await _executionService.StopExecutionAsync();
-        RefreshFromService();
+        try
+        {
+            await _executionService.StopExecutionAsync();
+            RefreshFromService();
+        }
+        catch (Exception ex)
+        {
+            LastError = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
+            await _loggingService.LogErrorAsync("Stop execution failed (UI)", ex);
+            UpdateCanExecute();
+        }
     }
 
-    private bool CanStop() => State == ExecutionState.Running || State == ExecutionState.Paused || State == ExecutionState.Stepping;
+    private bool CanStop() =>
+        (State == ExecutionState.Running || State == ExecutionState.Paused || State == ExecutionState.Stepping) &&
+        _executionService.CurrentSession?.Options.ControlMode == ExecutionControlMode.DebugInteractive;
 
     [RelayCommand(CanExecute = nameof(CanStep))]
     private async Task StepAsync()
     {
-        await _executionService.StepExecutionAsync();
-        RefreshFromService();
+        try
+        {
+            await _executionService.StepExecutionAsync();
+            RefreshFromService();
+        }
+        catch (Exception ex)
+        {
+            LastError = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
+            await _loggingService.LogErrorAsync("Step execution failed (UI)", ex);
+            UpdateCanExecute();
+        }
     }
 
-    private bool CanStep() => Script != null && (State == ExecutionState.Idle || State == ExecutionState.Paused || State == ExecutionState.Stopped);
+    // 單步只在「已暫停」時才有意義（避免尚未開始就能亂按、也避免隱性建立上下文造成狀態混亂）
+    private bool CanStep() =>
+        Script != null &&
+        State == ExecutionState.Paused &&
+        _executionService.CurrentSession?.Options.ControlMode == ExecutionControlMode.DebugInteractive;
 
-    [RelayCommand]
+    [RelayCommand(CanExecute = nameof(CanTerminate))]
     private async Task TerminateAsync()
     {
-        await _executionService.TerminateExecutionAsync();
-        RefreshFromService();
+        try
+        {
+            await _executionService.TerminateExecutionAsync();
+            RefreshFromService();
+        }
+        catch (Exception ex)
+        {
+            LastError = UiText.Format("Ui.ErrorPrefix", ex.Message, "Error: {0}");
+            await _loggingService.LogErrorAsync("Terminate execution failed (UI)", ex);
+            UpdateCanExecute();
+        }
     }
+
+    private bool CanTerminate() => State == ExecutionState.Running || State == ExecutionState.Paused || State == ExecutionState.Stepping;
 
     private void OnProgressChanged(object? sender, ExecutionProgressEventArgs e)
     {
-        CurrentCommandIndex = e.CurrentCommandIndex;
-        TotalCommandCount = e.TotalCommands;
-        CompletionPercentage = e.TotalCommands > 0 ? (double)e.CurrentCommandIndex / e.TotalCommands * 100.0 : 0.0;
+        RunOnUiThread(() =>
+        {
+            CurrentCommandIndex = e.CurrentCommandIndex;
+            TotalCommandCount = e.TotalCommands;
+            CompletionPercentage = Math.Clamp(e.CompletionPercentage, 0.0, 100.0);
+        });
     }
 
     private void OnStateChanged(object? sender, ExecutionStateChangedEventArgs e)
     {
-        State = e.NewState;
-        UpdateCanExecute();
+        RunOnUiThread(() =>
+        {
+            State = e.NewState;
+            UpdateCanExecute();
+        });
     }
 
     private void OnExecutionError(object? sender, ExecutionErrorEventArgs e)
     {
-        LastError = UiText.Format("Ui.ErrorPrefix", $"{e.Context}: {e.Error.GetType().Name} - {e.Error.Message}", "Error: {0}");
-        UpdateCanExecute();
+        RunOnUiThread(() =>
+        {
+            LastError = UiText.Format("Ui.ErrorPrefix", $"{e.Context}: {e.Error.GetType().Name} - {e.Error.Message}", "Error: {0}");
+            UpdateCanExecute();
+        });
     }
 
     private void OnExecutionCompleted(object? sender, ExecutionCompletedEventArgs e)
     {
-        State = e.FinalState;
-        UpdateCanExecute();
+        RunOnUiThread(() =>
+        {
+            // 執行完成後恢復到「待執行」（Idle），避免還要再按一次強制終止或停留在 Completed。
+            // 仍保留 Script 選擇狀態，讓使用者可以直接再次按 Start。
+            State = ExecutionState.Idle;
+            CurrentCommandIndex = 0;
+            TotalCommandCount = Script?.CommandCount ?? e.TotalCommandCount;
+            CompletionPercentage = 0;
+            UpdateCanExecute();
+        });
     }
 
     private void RefreshFromService()
@@ -218,6 +358,7 @@ public partial class ExecutionControlViewModel : ObservableObject
         ResumeCommand.NotifyCanExecuteChanged();
         StopCommand.NotifyCanExecuteChanged();
         StepCommand.NotifyCanExecuteChanged();
+        TerminateCommand.NotifyCanExecuteChanged();
     }
 }
 

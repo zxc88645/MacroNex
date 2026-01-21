@@ -250,6 +250,16 @@ public class ExecutionSession
 public class ExecutionOptions
 {
     /// <summary>
+    /// Identifies where an execution was triggered from (for UI/UX behavior).
+    /// </summary>
+    public ExecutionTriggerSource TriggerSource { get; set; } = ExecutionTriggerSource.DebugPanel;
+
+    /// <summary>
+    /// Controls which execution features are allowed (debug interactive vs run-only).
+    /// </summary>
+    public ExecutionControlMode ControlMode { get; set; } = ExecutionControlMode.DebugInteractive;
+
+    /// <summary>
     /// Speed multiplier for execution timing (1.0 = normal speed, 0.5 = half speed, 2.0 = double speed).
     /// </summary>
     public double SpeedMultiplier { get; set; } = 1.0;
@@ -306,11 +316,45 @@ public class ExecutionOptions
     /// <returns>A new ExecutionOptions instance configured for debugging.</returns>
     public static ExecutionOptions Debug() => new()
     {
+        TriggerSource = ExecutionTriggerSource.DebugPanel,
+        ControlMode = ExecutionControlMode.DebugInteractive,
         SpeedMultiplier = 0.5,
         ShowCountdown = false,
         StopOnError = true,
         RequireAuthorization = false
     };
+}
+
+/// <summary>
+/// Describes where a script execution was initiated.
+/// </summary>
+public enum ExecutionTriggerSource
+{
+    /// <summary>
+    /// Triggered from the UI "Execution" debug panel.
+    /// </summary>
+    DebugPanel,
+
+    /// <summary>
+    /// Triggered via a global/script hotkey.
+    /// </summary>
+    Hotkey
+}
+
+/// <summary>
+/// Controls the available execution controls for a session.
+/// </summary>
+public enum ExecutionControlMode
+{
+    /// <summary>
+    /// Debug mode: supports pause/resume/stop/step and per-command progress.
+    /// </summary>
+    DebugInteractive,
+
+    /// <summary>
+    /// Run-only mode: no pause/resume/stop/step; only termination is relevant.
+    /// </summary>
+    RunOnly
 }
 
 /// <summary>
