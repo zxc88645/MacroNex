@@ -16,8 +16,9 @@
             <Color x:Key="C_Bg1">#111827</Color>
             <Color x:Key="C_Surface">#0f172a</Color>
             <Color x:Key="C_Border">#263244</Color>
-            <Color x:Key="C_Text">#e5e7eb</Color>
-            <Color x:Key="C_TextMuted">#9ca3af</Color>
+            <!-- Text colors tuned for dark UI (slightly cooler, clearer contrast) -->
+            <Color x:Key="C_Text">#e8eef8</Color>
+            <Color x:Key="C_TextMuted">#a7b0c0</Color>
             <Color x:Key="C_Accent">#3b82f6</Color>
             <Color x:Key="C_Accent2">#22c55e</Color>
             <Color x:Key="C_Danger">#ef4444</Color>
