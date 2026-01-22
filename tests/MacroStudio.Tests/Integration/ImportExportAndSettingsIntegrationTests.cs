@@ -26,11 +26,10 @@ public class ImportExportAndSettingsIntegrationTests
         var provider = services.BuildServiceProvider();
         var settings = provider.GetRequiredService<ISettingsService>();
 
-        var s = new AppSettings { DefaultSpeedMultiplier = 1.5, ShowCountdown = false, CountdownSeconds = 0.0 };
+        var s = new AppSettings { ShowCountdown = false, CountdownSeconds = 0.0 };
         await settings.SaveAsync(s);
 
         var loaded = await settings.LoadAsync();
-        Assert.Equal(1.5, loaded.DefaultSpeedMultiplier);
         Assert.False(loaded.ShowCountdown);
     }
 

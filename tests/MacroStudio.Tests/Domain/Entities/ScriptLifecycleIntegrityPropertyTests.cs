@@ -118,12 +118,8 @@ public class ScriptLifecycleIntegrityPropertyTests
             if (script.ModifiedAt < script.CreatedAt)
                 return false; // Modification time >= creation time failed
 
-            // Test estimated duration calculation
-            var expectedDuration = script.Commands.Sum(cmd => 
-                cmd.Delay.TotalMilliseconds + 
-                (cmd is SleepCommand sleepCmd ? sleepCmd.Duration.TotalMilliseconds : 0));
-            if (Math.Abs(script.EstimatedDuration.TotalMilliseconds - expectedDuration) >= 1)
-                return false; // Duration property failed
+            // EstimatedDuration is no longer available - scripts use SourceText instead
+            // Skip duration check as it's not applicable for Lua-based scripts
 
             return true;
         }
@@ -264,8 +260,7 @@ public class ScriptLifecycleIntegrityPropertyTests
             var clearProperties = 
                 script.CommandCount == 0 &&
                 script.Commands.Count == 0 &&
-                script.ModifiedAt > preClearModifiedAt &&
-                script.EstimatedDuration == TimeSpan.Zero;
+                script.ModifiedAt > preClearModifiedAt;
             
             if (!clearProperties)
                 return false;

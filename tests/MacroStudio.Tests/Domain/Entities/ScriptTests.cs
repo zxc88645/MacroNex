@@ -21,7 +21,7 @@ public class ScriptTests
         Assert.Equal(0, script.CommandCount);
         Assert.True(script.CreatedAt <= DateTime.UtcNow);
         Assert.True(script.ModifiedAt <= DateTime.UtcNow);
-        Assert.Equal(TimeSpan.Zero, script.EstimatedDuration);
+        Assert.Equal(0, script.SourceTextLength);
     }
 
     [Theory]
@@ -187,24 +187,17 @@ public class ScriptTests
     }
 
     [Fact]
-    public void EstimatedDuration_WithCommandsAndDelays_CalculatesCorrectly()
+    public void SourceTextLength_WithSourceText_ReturnsCorrectLength()
     {
         // Arrange
         var script = new Script("Test Script");
-        var command1 = new MouseMoveCommand(new Point(100, 200)) { Delay = TimeSpan.FromMilliseconds(100) };
-        var command2 = new SleepCommand(TimeSpan.FromMilliseconds(500)) { Delay = TimeSpan.FromMilliseconds(50) };
-        var command3 = new MouseClickCommand(MouseButton.Left, ClickType.Click) { Delay = TimeSpan.FromMilliseconds(25) };
-        
-        script.AddCommand(command1);
-        script.AddCommand(command2);
-        script.AddCommand(command3);
+        script.SourceText = "move(100, 200)\nmsleep(500)";
 
         // Act
-        var duration = script.EstimatedDuration;
+        var length = script.SourceTextLength;
 
         // Assert
-        // Total: 100ms (delay1) + 50ms (delay2) + 500ms (sleep duration) + 25ms (delay3) = 675ms
-        Assert.Equal(TimeSpan.FromMilliseconds(675), duration);
+        Assert.Equal(script.SourceText.Length, length);
     }
 
     [Fact]

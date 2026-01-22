@@ -41,7 +41,6 @@ public class ExecutionUsesCurrentlyEditedScriptTests
             settings.Setup(x => x.LoadAsync())
                 .ReturnsAsync(new AppSettings
                 {
-                    DefaultSpeedMultiplier = 1.0,
                     ShowCountdown = false,
                     CountdownSeconds = 0
                 });
@@ -137,8 +136,6 @@ public class ExecutionUsesCurrentlyEditedScriptTests
 #pragma warning disable CS0067 // The interface requires these events; tests don't need to raise all of them.
         public event EventHandler<ExecutionProgressEventArgs>? ProgressChanged;
         public event EventHandler<ExecutionStateChangedEventArgs>? StateChanged;
-        public event EventHandler<CommandExecutingEventArgs>? CommandExecuting;
-        public event EventHandler<CommandExecutedEventArgs>? CommandExecuted;
         public event EventHandler<ExecutionErrorEventArgs>? ExecutionError;
         public event EventHandler<ExecutionCompletedEventArgs>? ExecutionCompleted;
 #pragma warning restore CS0067
