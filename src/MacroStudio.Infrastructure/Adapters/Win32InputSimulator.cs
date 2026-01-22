@@ -539,7 +539,7 @@ public class Win32InputSimulator : IInputSimulator
         if (sent != inputs.Length)
         {
             var error = GetLastError();
-            _logger.LogError("SendInput failed. Expected {Expected} inputs, sent {Sent}. Win32 error: {Error}", 
+            _logger.LogError("SendInput failed. Expected {Expected} inputs, sent {Sent}. Win32 error: {Error}",
                 inputs.Length, sent, error);
             throw new InputSimulationException($"SendInput failed. Expected {inputs.Length} inputs, sent {sent}", (int)error);
         }
@@ -562,7 +562,7 @@ public class Win32InputSimulator : IInputSimulator
 
         if (position.X >= screenWidth || position.Y >= screenHeight)
         {
-            _logger.LogWarning("Position {Position} is outside screen bounds ({Width}x{Height})", 
+            _logger.LogWarning("Position {Position} is outside screen bounds ({Width}x{Height})",
                 position, screenWidth, screenHeight);
         }
     }

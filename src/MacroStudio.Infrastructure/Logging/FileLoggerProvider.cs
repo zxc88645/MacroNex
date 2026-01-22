@@ -58,7 +58,7 @@ public class FileLoggerProvider : ILoggerProvider
 
             var message = formatter(state, exception);
             var logLine = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [{logLevel}] [{_categoryName}] {message}";
-            
+
             if (exception != null)
             {
                 logLine += $"\n{exception}";

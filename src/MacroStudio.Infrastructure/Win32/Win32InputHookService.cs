@@ -196,13 +196,13 @@ public sealed class Win32InputHookService : IInputHookService, IDisposable
                 return true;
             case WM_XBUTTONDOWN:
             case WM_XBUTTONUP:
-            {
-                // High word of mouseData indicates which X button.
-                var xButton = (mouseData >> 16) & 0xFFFF;
-                button = xButton == XBUTTON2 ? MouseButton.XButton2 : MouseButton.XButton1;
-                clickType = msg == WM_XBUTTONDOWN ? ClickType.Down : ClickType.Up;
-                return true;
-            }
+                {
+                    // High word of mouseData indicates which X button.
+                    var xButton = (mouseData >> 16) & 0xFFFF;
+                    button = xButton == XBUTTON2 ? MouseButton.XButton2 : MouseButton.XButton1;
+                    clickType = msg == WM_XBUTTONDOWN ? ClickType.Down : ClickType.Up;
+                    return true;
+                }
             default:
                 return false;
         }

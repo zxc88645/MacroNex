@@ -29,7 +29,7 @@ public class JsonFileStorageService : IFileStorageService
     public JsonFileStorageService(ILogger<JsonFileStorageService> logger, string? storageDirectory = null)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        
+
         // Use LocalApplicationData for storage unless an override is provided (tests).
         if (string.IsNullOrWhiteSpace(storageDirectory))
         {
@@ -76,7 +76,7 @@ public class JsonFileStorageService : IFileStorageService
             _logger.LogDebug("Loading scripts from {FilePath}", _scriptsFilePath);
 
             var jsonContent = await File.ReadAllTextAsync(_scriptsFilePath);
-            
+
             if (string.IsNullOrWhiteSpace(jsonContent))
             {
                 _logger.LogWarning("Scripts file is empty. Returning empty collection.");
@@ -84,7 +84,7 @@ public class JsonFileStorageService : IFileStorageService
             }
 
             var storageModel = JsonSerializer.Deserialize<ScriptStorageModel>(jsonContent, _jsonOptions);
-            
+
             if (storageModel == null)
             {
                 _logger.LogWarning("Failed to deserialize scripts file. Returning empty collection.");
@@ -95,9 +95,9 @@ public class JsonFileStorageService : IFileStorageService
             var migratedModel = MigrateSchema(storageModel);
 
             var scripts = migratedModel.Scripts.Select(s => ConvertToScript(s)).ToList();
-            
+
             _logger.LogInformation("Loaded {Count} scripts from storage", scripts.Count);
-            
+
             return scripts;
         }
         catch (JsonException ex)
@@ -124,7 +124,7 @@ public class JsonFileStorageService : IFileStorageService
 
             // Load all existing scripts
             var allScripts = (await LoadScriptsAsync()).ToList();
-            
+
             // Remove the script if it already exists, then add the updated version
             var existingIndex = allScripts.FindIndex(s => s.Id == script.Id);
             if (existingIndex >= 0)
@@ -225,7 +225,7 @@ public class JsonFileStorageService : IFileStorageService
             var script = ConvertToScript(scriptDto);
 
             _logger.LogInformation("Successfully imported script {ScriptId} ({ScriptName})", script.Id, script.Name);
-            
+
             return script;
         }
         catch (JsonException ex)
@@ -289,7 +289,7 @@ public class JsonFileStorageService : IFileStorageService
         }
 
         _logger.LogInformation("Migrating schema from version {OldVersion} to 1.0", model.Version);
-        
+
         // For now, we only support version 1.0
         // Future versions would have migration logic here
         return model;
@@ -405,7 +405,7 @@ public class JsonFileStorageService : IFileStorageService
     private Script ConvertToScript(ScriptDto dto)
     {
         var commands = dto.Commands.Select(ConvertToCommand).ToList();
-        
+
         HotkeyDefinition? triggerHotkey = null;
         if (dto.TriggerHotkey != null)
         {
@@ -435,7 +435,7 @@ public class JsonFileStorageService : IFileStorageService
                 _logger.LogWarning(ex, "Failed to parse trigger hotkey for script {ScriptId}", dto.Id);
             }
         }
-        
+
         return new Script(
             dto.Id,
             dto.Name,
@@ -563,7 +563,7 @@ public class JsonFileStorageService : IFileStorageService
         return value switch
         {
             List<string> list => list,
-            JsonElement element when element.ValueKind == JsonValueKind.Array => 
+            JsonElement element when element.ValueKind == JsonValueKind.Array =>
                 element.EnumerateArray().Select(e => e.GetString() ?? string.Empty).ToList(),
             _ => throw new StorageException($"Invalid parameter type for '{key}': expected string array")
         };
@@ -581,9 +581,9 @@ public class JsonFileStorageService : IFileStorageService
             long l => TimeSpan.FromMilliseconds(l),
             int i => TimeSpan.FromMilliseconds(i),
             double d => TimeSpan.FromMilliseconds(d),
-            JsonElement element when element.ValueKind == JsonValueKind.String => 
+            JsonElement element when element.ValueKind == JsonValueKind.String =>
                 TimeSpan.Parse(element.GetString() ?? "00:00:00"),
-            JsonElement element when element.ValueKind == JsonValueKind.Number => 
+            JsonElement element when element.ValueKind == JsonValueKind.Number =>
                 TimeSpan.FromMilliseconds(element.GetDouble()),
             _ => throw new StorageException($"Invalid parameter type for '{key}': expected TimeSpan")
         };

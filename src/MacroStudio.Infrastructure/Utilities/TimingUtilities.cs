@@ -32,26 +32,26 @@ public class TimingUtilities
     {
         if (distance < 0)
             throw new ArgumentException("Distance must be non-negative", nameof(distance));
-        
+
         if (baseSpeed <= 0)
             throw new ArgumentException("Base speed must be positive", nameof(baseSpeed));
-        
+
         // Calculate base delay
         var baseDelayMs = distance / baseSpeed;
-        
+
         // Add minimum delay for very short movements
         var minDelayMs = 10.0;
         var delayMs = Math.Max(minDelayMs, baseDelayMs);
-        
+
         // Cap maximum delay for very long movements
         var maxDelayMs = 2000.0;
         delayMs = Math.Min(maxDelayMs, delayMs);
-        
+
         var delay = TimeSpan.FromMilliseconds(delayMs);
-        
-        _logger.LogTrace("Calculated movement delay for distance {Distance:F2}px: {Delay}ms", 
+
+        _logger.LogTrace("Calculated movement delay for distance {Distance:F2}px: {Delay}ms",
             distance, delay.TotalMilliseconds);
-        
+
         return delay;
     }
 
@@ -65,24 +65,24 @@ public class TimingUtilities
     {
         if (variationPercent < 0.0 || variationPercent > 1.0)
             throw new ArgumentOutOfRangeException(nameof(variationPercent), "Variation percent must be between 0.0 and 1.0");
-        
+
         if (baseDelay == TimeSpan.Zero || variationPercent == 0.0)
             return baseDelay;
-        
+
         // Generate random variation factor (-variationPercent to +variationPercent)
         var variationFactor = (_random.NextDouble() - 0.5) * 2 * variationPercent;
         var variationMs = baseDelay.TotalMilliseconds * variationFactor;
-        
+
         var variedDelayMs = baseDelay.TotalMilliseconds + variationMs;
-        
+
         // Ensure the delay doesn't become negative
         variedDelayMs = Math.Max(0, variedDelayMs);
-        
+
         var variedDelay = TimeSpan.FromMilliseconds(variedDelayMs);
-        
-        _logger.LogTrace("Added {Variation:F1}% variation to delay {Original}ms: {Varied}ms", 
+
+        _logger.LogTrace("Added {Variation:F1}% variation to delay {Original}ms: {Varied}ms",
             variationFactor * 100, baseDelay.TotalMilliseconds, variedDelay.TotalMilliseconds);
-        
+
         return variedDelay;
     }
 
@@ -96,16 +96,16 @@ public class TimingUtilities
     {
         if (speedMultiplier <= 0)
             throw new ArgumentException("Speed multiplier must be positive", nameof(speedMultiplier));
-        
+
         if (speedMultiplier == 1.0)
             return originalDelay;
-        
+
         var adjustedDelayMs = originalDelay.TotalMilliseconds / speedMultiplier;
         var adjustedDelay = TimeSpan.FromMilliseconds(adjustedDelayMs);
-        
-        _logger.LogTrace("Applied speed multiplier {Multiplier}x to delay {Original}ms: {Adjusted}ms", 
+
+        _logger.LogTrace("Applied speed multiplier {Multiplier}x to delay {Original}ms: {Adjusted}ms",
             speedMultiplier, originalDelay.TotalMilliseconds, adjustedDelay.TotalMilliseconds);
-        
+
         return adjustedDelay;
     }
 
@@ -119,24 +119,24 @@ public class TimingUtilities
     {
         if (textLength < 0)
             throw new ArgumentException("Text length must be non-negative", nameof(textLength));
-        
+
         if (wordsPerMinute <= 0)
             throw new ArgumentException("Words per minute must be positive", nameof(wordsPerMinute));
-        
+
         if (textLength == 0)
             return TimeSpan.Zero;
-        
+
         // Average word length is approximately 5 characters
         var averageWordLength = 5.0;
         var charactersPerMinute = wordsPerMinute * averageWordLength;
         var charactersPerSecond = charactersPerMinute / 60.0;
-        
+
         var typingTimeSeconds = textLength / charactersPerSecond;
         var typingDelay = TimeSpan.FromSeconds(typingTimeSeconds);
-        
-        _logger.LogTrace("Calculated typing delay for {Length} characters at {WPM} WPM: {Delay}ms", 
+
+        _logger.LogTrace("Calculated typing delay for {Length} characters at {WPM} WPM: {Delay}ms",
             textLength, wordsPerMinute, typingDelay.TotalMilliseconds);
-        
+
         return typingDelay;
     }
 
@@ -149,20 +149,20 @@ public class TimingUtilities
     {
         if (keyCount <= 0)
             throw new ArgumentException("Key count must be positive", nameof(keyCount));
-        
+
         // Base delays for key combinations
         var basePressDelayMs = 20.0 + (keyCount - 1) * 10.0; // Slightly longer for more keys
         var baseHoldDelayMs = 50.0; // Hold all keys briefly
         var baseReleaseDelayMs = 15.0 + (keyCount - 1) * 5.0; // Slightly longer for more keys
-        
+
         // Add small random variations
         var pressDelay = TimeSpan.FromMilliseconds(basePressDelayMs + _random.NextDouble() * 10);
         var holdDelay = TimeSpan.FromMilliseconds(baseHoldDelayMs + _random.NextDouble() * 20);
         var releaseDelay = TimeSpan.FromMilliseconds(baseReleaseDelayMs + _random.NextDouble() * 10);
-        
-        _logger.LogTrace("Calculated key combo timing for {KeyCount} keys: press={Press}ms, hold={Hold}ms, release={Release}ms", 
+
+        _logger.LogTrace("Calculated key combo timing for {KeyCount} keys: press={Press}ms, hold={Hold}ms, release={Release}ms",
             keyCount, pressDelay.TotalMilliseconds, holdDelay.TotalMilliseconds, releaseDelay.TotalMilliseconds);
-        
+
         return (pressDelay, holdDelay, releaseDelay);
     }
 
@@ -177,9 +177,9 @@ public class TimingUtilities
     {
         if (baseDelayMs < 0)
             throw new ArgumentException("Base delay must be non-negative", nameof(baseDelayMs));
-        
+
         var delayMs = baseDelayMs;
-        
+
         // Adjust delay based on character patterns
         if (previousChar.HasValue)
         {
@@ -188,7 +188,7 @@ public class TimingUtilities
             {
                 delayMs *= 1.2;
             }
-            
+
             // Shorter delay for common letter combinations
             var combo = $"{previousChar.Value}{currentChar}".ToLowerInvariant();
             if (IsCommonCombination(combo))
@@ -196,19 +196,19 @@ public class TimingUtilities
                 delayMs *= 0.8;
             }
         }
-        
+
         // Add random variation (±20%)
         var variation = (_random.NextDouble() - 0.5) * 0.4;
         delayMs *= (1.0 + variation);
-        
+
         // Ensure minimum delay
         delayMs = Math.Max(20.0, delayMs);
-        
+
         var delay = TimeSpan.FromMilliseconds(delayMs);
-        
-        _logger.LogTrace("Calculated keystroke delay for '{Previous}' -> '{Current}': {Delay}ms", 
+
+        _logger.LogTrace("Calculated keystroke delay for '{Previous}' -> '{Current}': {Delay}ms",
             previousChar, currentChar, delay.TotalMilliseconds);
-        
+
         return delay;
     }
 
@@ -226,7 +226,7 @@ public class TimingUtilities
             "at", "ou", "ea", "ha", "ng", "as", "or", "ti", "is", "et",
             "it", "ar", "te", "se", "hi", "of", "be", "to", "st", "nt"
         };
-        
+
         return commonCombinations.Contains(combination);
     }
 
@@ -241,24 +241,24 @@ public class TimingUtilities
     {
         if (attempt < 1)
             throw new ArgumentException("Attempt must be at least 1", nameof(attempt));
-        
+
         if (baseDelay < TimeSpan.Zero)
             throw new ArgumentException("Base delay must be non-negative", nameof(baseDelay));
-        
+
         if (maxDelay < baseDelay)
             throw new ArgumentException("Max delay must be greater than or equal to base delay", nameof(maxDelay));
-        
+
         var multiplier = Math.Pow(2, attempt - 1);
         var calculatedDelayMs = baseDelay.TotalMilliseconds * multiplier;
-        
+
         // Cap at maximum delay
         calculatedDelayMs = Math.Min(calculatedDelayMs, maxDelay.TotalMilliseconds);
-        
+
         var backoffDelay = TimeSpan.FromMilliseconds(calculatedDelayMs);
-        
-        _logger.LogTrace("Calculated exponential backoff for attempt {Attempt}: {Delay}ms", 
+
+        _logger.LogTrace("Calculated exponential backoff for attempt {Attempt}: {Delay}ms",
             attempt, backoffDelay.TotalMilliseconds);
-        
+
         return backoffDelay;
     }
 }

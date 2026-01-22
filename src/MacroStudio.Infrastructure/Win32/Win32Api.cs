@@ -92,7 +92,7 @@ internal static class Win32Api
     public static extern IntPtr GetModuleHandle(string? lpModuleName);
 
     // Hotkey registration APIs
-    
+
     /// <summary>
     /// Defines a system-wide hot key.
     /// </summary>

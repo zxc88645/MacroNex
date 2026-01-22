@@ -23,7 +23,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
     private readonly ConcurrentDictionary<int, HotkeyRegistrationInfo> _pendingRegistrations = new();
     private readonly ConcurrentDictionary<int, TaskCompletionSource<bool>> _pendingUnregistrations = new();
     private readonly ConcurrentDictionary<int, HotkeyRegistrationException> _registrationFailures = new();
-    
+
     private Thread? _messageLoopThread;
     private volatile bool _isRunning = false;
     private volatile bool _isDisposed = false;
@@ -55,7 +55,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
         _api = api ?? throw new ArgumentNullException(nameof(api));
         _logger.LogDebug("Win32GlobalHotkeyService initialized");
-        
+
         StartMessageLoop();
     }
 
@@ -73,7 +73,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         }
 
         _logger.LogDebug("Registering hotkey: {Hotkey}", hotkey);
-        
+
         // Wait for message loop thread to be ready
         var maxWaitTime = TimeSpan.FromSeconds(5);
         var startTime = DateTime.UtcNow;
@@ -116,8 +116,8 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
             // If we find an exact match, it means the hotkey is already registered (possibly with a different instance)
             // In this case, we should return successfully rather than throwing an exception
             var conflictingHotkey = _registeredHotkeys.Values
-                .FirstOrDefault(h => h.Modifiers == hotkey.Modifiers && 
-                                     h.Key == hotkey.Key && 
+                .FirstOrDefault(h => h.Modifiers == hotkey.Modifiers &&
+                                     h.Key == hotkey.Key &&
                                      h.TriggerMode == hotkey.TriggerMode);
 
             if (conflictingHotkey != null)
@@ -188,12 +188,12 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
             {
                 _pendingRegistrations.TryRemove(hotkeyId, out _);
             }
-            
+
             // Check if registration failed due to already registered error
             // This can happen if the message loop processed the registration but it failed
             // We'll check the pending registrations to see if there was an error
             _logger.LogWarning("Hotkey registration timed out for {Hotkey} (ID={HotkeyId}). This may indicate the hotkey is already registered by another application or the message loop is not processing messages.", hotkey, hotkeyId);
-            
+
             throw new HotkeyRegistrationException(
                 "Hotkey registration timed out",
                 hotkey);
@@ -210,16 +210,16 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
 
         ThrowIfDisposed();
 
-        _logger.LogWarning("UnregisterHotkeyAsync called: {Hotkey} (Modifiers={Modifiers}, Key={Key}, TriggerMode={TriggerMode})", 
+        _logger.LogWarning("UnregisterHotkeyAsync called: {Hotkey} (Modifiers={Modifiers}, Key={Key}, TriggerMode={TriggerMode})",
             hotkey, hotkey.Modifiers, hotkey.Key, hotkey.TriggerMode);
-        
+
         // Log current registered hotkeys for debugging
         lock (_lockObject)
         {
             _logger.LogWarning("Currently registered hotkeys count before unregister: {Count}", _registeredHotkeys.Count);
             foreach (var kvp in _registeredHotkeys)
             {
-                _logger.LogWarning("  Registered: ID={Id}, Hotkey={Hotkey} (Modifiers={Modifiers}, Key={Key}, TriggerMode={TriggerMode})", 
+                _logger.LogWarning("  Registered: ID={Id}, Hotkey={Hotkey} (Modifiers={Modifiers}, Key={Key}, TriggerMode={TriggerMode})",
                     kvp.Key, kvp.Value, kvp.Value.Modifiers, kvp.Value.Key, kvp.Value.TriggerMode);
             }
         }
@@ -259,8 +259,8 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
                 foreach (var kvp in _registeredHotkeys)
                 {
                     var registeredHotkey = kvp.Value;
-                    if (registeredHotkey.Modifiers == hotkey.Modifiers && 
-                        registeredHotkey.Key == hotkey.Key && 
+                    if (registeredHotkey.Modifiers == hotkey.Modifiers &&
+                        registeredHotkey.Key == hotkey.Key &&
                         registeredHotkey.TriggerMode == hotkey.TriggerMode)
                     {
                         hotkeyId = kvp.Key;
@@ -272,7 +272,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
 
             if (hotkeyId == null)
             {
-                _logger.LogWarning("Hotkey {Hotkey} is not registered (tried exact match and Modifiers/Key/TriggerMode match). Registered hotkeys: {Count}", 
+                _logger.LogWarning("Hotkey {Hotkey} is not registered (tried exact match and Modifiers/Key/TriggerMode match). Registered hotkeys: {Count}",
                     hotkey, _registeredHotkeys.Count);
                 return;
             }
@@ -298,7 +298,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         var unregistrationTimeout = TimeSpan.FromSeconds(5);
         var unregistrationStart = DateTime.UtcNow;
         Task<bool> unregisterTask;
-        
+
         lock (_lockObject)
         {
             if (!_pendingUnregistrations.TryGetValue(hotkeyId!.Value, out var tcs))
@@ -333,14 +333,14 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
             }
             _logger.LogError(ex, "Error waiting for hotkey unregistration for {Hotkey}", hotkey);
         }
-        
+
         // Log registered hotkeys after unregister to verify
         lock (_lockObject)
         {
             _logger.LogWarning("Currently registered hotkeys count after unregister: {Count}", _registeredHotkeys.Count);
             foreach (var kvp in _registeredHotkeys)
             {
-                _logger.LogWarning("  Still registered: ID={Id}, Hotkey={Hotkey} (Modifiers={Modifiers}, Key={Key}, TriggerMode={TriggerMode})", 
+                _logger.LogWarning("  Still registered: ID={Id}, Hotkey={Hotkey} (Modifiers={Modifiers}, Key={Key}, TriggerMode={TriggerMode})",
                     kvp.Key, kvp.Value, kvp.Value.Modifiers, kvp.Value.Key, kvp.Value.TriggerMode);
             }
         }
@@ -466,7 +466,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         if (_messageLoopThread.IsAlive)
         {
             _messageLoopThread.Join(TimeSpan.FromSeconds(5));
-            
+
             if (_messageLoopThread.IsAlive)
             {
                 _logger.LogWarning("Message loop thread did not stop gracefully");
@@ -543,14 +543,14 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         try
         {
             var hotkeyId = (int)msg.wParam;
-            
+
             if (_pendingRegistrations.TryRemove(hotkeyId, out var registrationInfo))
             {
                 // Register the hotkey with Win32 on this thread
                 if (!_api.RegisterHotKey(IntPtr.Zero, registrationInfo.HotkeyId, registrationInfo.Modifiers, registrationInfo.VirtualKey))
                 {
                     var error = _api.GetLastError();
-                    
+
                     var errorMessage = error switch
                     {
                         ERROR_HOTKEY_ALREADY_REGISTERED => "Hotkey is already registered by another application",
@@ -561,16 +561,16 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
                     lock (_lockObject)
                     {
                         var existingHotkey = _registeredHotkeys.Values
-                            .FirstOrDefault(h => h.Modifiers == registrationInfo.Hotkey.Modifiers && 
-                                                 h.Key == registrationInfo.Hotkey.Key && 
+                            .FirstOrDefault(h => h.Modifiers == registrationInfo.Hotkey.Modifiers &&
+                                                 h.Key == registrationInfo.Hotkey.Key &&
                                                  h.TriggerMode == registrationInfo.Hotkey.TriggerMode);
-                        
+
                         if (existingHotkey != null && error == ERROR_HOTKEY_ALREADY_REGISTERED)
                         {
                             // Hotkey is already registered in our tracking, reuse the existing ID
                             var existingId = _hotkeyIds[existingHotkey];
                             _logger.LogDebug("Hotkey {Hotkey} is already registered with ID {ExistingId}, reusing existing registration", registrationInfo.Hotkey, existingId);
-                            
+
                             // Update the pending registration to use the existing ID
                             // But we can't change the ID now, so we'll just log and return
                             // The caller will timeout, but at least we've logged the issue
@@ -581,7 +581,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
                             _logger.LogError("Failed to register hotkey {Hotkey} on message loop thread. Win32 error: {Error}, Message: {ErrorMessage}", registrationInfo.Hotkey, error, errorMessage);
                         }
                     }
-                    
+
                     // IMPORTANT:
                     // RegisterHotkeyAsync is waiting for either a success signal (_registeredHotkeys contains ID)
                     // or a failure signal (_registrationFailures contains ID). Record the failure to avoid timeouts.
@@ -620,7 +620,7 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
     {
         var hotkeyId = (int)msg.wParam;
         TaskCompletionSource<bool>? tcs = null;
-        
+
         try
         {
             if (!_registeredHotkeys.TryGetValue(hotkeyId, out var hotkey))
@@ -635,36 +635,36 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
             }
 
             _logger.LogWarning("Calling Win32 UnregisterHotKey for hotkey {Hotkey} with ID {HotkeyId} on message loop thread", hotkey, hotkeyId);
-            
+
             // Get the task completion source before processing
             _pendingUnregistrations.TryRemove(hotkeyId, out tcs);
-            
+
             // Unregister the hotkey with Win32 on this thread (message loop thread)
             if (!_api.UnregisterHotKey(IntPtr.Zero, hotkeyId))
             {
                 var error = _api.GetLastError();
-                
+
                 // If the error is "not registered", it means our internal tracking is out of sync
                 if (error == ERROR_HOTKEY_NOT_REGISTERED)
                 {
-                    _logger.LogWarning("Win32 reports hotkey {Hotkey} with ID {HotkeyId} is not registered, but it's in our tracking. Cleaning up internal state.", 
+                    _logger.LogWarning("Win32 reports hotkey {Hotkey} with ID {HotkeyId} is not registered, but it's in our tracking. Cleaning up internal state.",
                         hotkey, hotkeyId);
-                    
+
                     // Remove from tracking even though Win32 says it's not registered
                     lock (_lockObject)
                     {
                         _hotkeyIds.TryRemove(hotkey, out _);
                         _registeredHotkeys.TryRemove(hotkeyId, out _);
                     }
-                    
+
                     _logger.LogWarning("Cleaned up orphaned hotkey tracking for {Hotkey}", hotkey);
-                    
+
                     // Complete the task with success (we cleaned up the state)
                     tcs?.SetResult(true);
                     return;
                 }
-                
-                _logger.LogError("Win32 UnregisterHotKey FAILED for hotkey {Hotkey} with ID {HotkeyId}. Win32 error: {Error}", 
+
+                _logger.LogError("Win32 UnregisterHotKey FAILED for hotkey {Hotkey} with ID {HotkeyId}. Win32 error: {Error}",
                     hotkey, hotkeyId, error);
 
                 // Complete the task with failure
@@ -683,8 +683,8 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
                 _hotkeyIds.TryRemove(hotkey, out _);
                 _registeredHotkeys.TryRemove(hotkeyId, out _);
             }
-            
-            _logger.LogInformation("Successfully unregistered hotkey {Hotkey} with ID {HotkeyId}. Remaining registered hotkeys: {Count}", 
+
+            _logger.LogInformation("Successfully unregistered hotkey {Hotkey} with ID {HotkeyId}. Remaining registered hotkeys: {Count}",
                 hotkey, hotkeyId, _registeredHotkeys.Count);
 
             // Complete the task with success
@@ -710,13 +710,13 @@ public class Win32GlobalHotkeyService : IGlobalHotkeyService, IDisposable
         try
         {
             var hotkeyId = (int)msg.wParam;
-            
+
             if (_registeredHotkeys.TryGetValue(hotkeyId, out var hotkey))
             {
                 _logger.LogTrace("Hotkey pressed: {Hotkey}", hotkey);
-                
+
                 var eventArgs = new HotkeyPressedEventArgs(hotkey, DateTime.Now);
-                
+
                 // Raise the event on a background thread to avoid blocking the message loop
                 Task.Run(() =>
                 {
