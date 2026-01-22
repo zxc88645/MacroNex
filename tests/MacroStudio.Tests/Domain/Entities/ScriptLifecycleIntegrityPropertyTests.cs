@@ -23,11 +23,11 @@ public class ScriptLifecycleIntegrityPropertyTests
     public bool ScriptLifecycleIntegrity(NonEmptyString scriptName)
     {
         var name = scriptName.Get;
-        
+
         // Skip names that would be invalid after trimming (whitespace-only)
         if (string.IsNullOrWhiteSpace(name))
             return true;
-        
+
         try
         {
             // Test script creation (Requirement 1.1)
@@ -63,7 +63,7 @@ public class ScriptLifecycleIntegrityPropertyTests
                 return false; // Correct name failed
             if (duplicatedScript.CommandCount != script.CommandCount)
                 return false; // Same command count failed
-            if (!duplicatedScript.Commands.All(cmd => script.Commands.Any(origCmd => 
+            if (!duplicatedScript.Commands.All(cmd => script.Commands.Any(origCmd =>
                 cmd.GetType() == origCmd.GetType() && cmd.Id != origCmd.Id)))
                 return false; // Commands are clones failed
 
@@ -85,7 +85,7 @@ public class ScriptLifecycleIntegrityPropertyTests
             if (script.CommandCount > 0)
             {
                 var originalCommandCount = script.CommandCount;
-                
+
                 // Test command removal
                 var removeResult = script.RemoveCommandAt(0);
                 if (!removeResult)
@@ -142,15 +142,15 @@ public class ScriptLifecycleIntegrityPropertyTests
     {
         var name = scriptName.Get;
         var count = Math.Min(commandCount.Get, 10); // Limit to reasonable size
-        
+
         // Skip names that would be invalid after trimming (whitespace-only)
         if (string.IsNullOrWhiteSpace(name))
             return true;
-        
+
         if (count == 0) return true; // Skip empty case
 
         var script = new Script(name);
-        
+
         // Add test commands
         var commands = new List<Command>();
         for (int i = 0; i < count; i++)
@@ -172,14 +172,14 @@ public class ScriptLifecycleIntegrityPropertyTests
             var fromIndex = 0;
             var toIndex = originalCommandCount - 1;
             var commandToMove = originalCommands[fromIndex];
-            
+
             var moveResult = script.MoveCommand(fromIndex, toIndex);
-            var moveProperties = 
+            var moveProperties =
                 moveResult &&
                 script.CommandCount == originalCommandCount && // Count unchanged
                 script.Commands[toIndex] == commandToMove && // Command moved to correct position
                 script.Commands.All(cmd => originalCommands.Contains(cmd)); // All original commands still present
-            
+
             if (!moveProperties)
                 return false;
         }
@@ -190,11 +190,11 @@ public class ScriptLifecycleIntegrityPropertyTests
             var replaceIndex = 0;
             var newCommand = new MouseMoveCommand(new Point(999, 999));
             var replaceResult = script.ReplaceCommand(replaceIndex, newCommand);
-            var replaceProperties = 
+            var replaceProperties =
                 replaceResult &&
                 script.CommandCount == originalCommandCount && // Count unchanged
                 script.Commands[replaceIndex] == newCommand; // Command replaced correctly
-            
+
             if (!replaceProperties)
                 return false;
         }
@@ -222,11 +222,11 @@ public class ScriptLifecycleIntegrityPropertyTests
     {
         var name = scriptName.Get;
         var count = Math.Min(commandCount.Get, 5); // Limit to reasonable size
-        
+
         // Skip names that would be invalid after trimming (whitespace-only)
         if (string.IsNullOrWhiteSpace(name))
             return true;
-        
+
         var script = new Script(name);
 
         // Add commands one by one and verify consistency
@@ -234,18 +234,18 @@ public class ScriptLifecycleIntegrityPropertyTests
         {
             var preAddModifiedAt = script.ModifiedAt;
             var preAddCount = script.CommandCount;
-            
+
             Thread.Sleep(10); // Ensure time difference
             var cmd = new MouseMoveCommand(new Point(i * 10, i * 10));
             script.AddCommand(cmd);
-            
+
             // Verify state consistency after each addition
-            var stateConsistent = 
+            var stateConsistent =
                 script.CommandCount == preAddCount + 1 && // Count incremented
                 script.ModifiedAt > preAddModifiedAt && // ModifiedAt updated
                 script.Commands.Last() == cmd && // Command added at end
                 script.IsValid() == script.Commands.All(c => c.IsValid()); // Validation consistent
-            
+
             if (!stateConsistent)
                 return false;
         }
@@ -256,12 +256,12 @@ public class ScriptLifecycleIntegrityPropertyTests
             var preClearModifiedAt = script.ModifiedAt;
             Thread.Sleep(10);
             script.ClearCommands();
-            
-            var clearProperties = 
+
+            var clearProperties =
                 script.CommandCount == 0 &&
                 script.Commands.Count == 0 &&
                 script.ModifiedAt > preClearModifiedAt;
-            
+
             if (!clearProperties)
                 return false;
         }
@@ -278,32 +278,32 @@ public class ScriptLifecycleIntegrityPropertyTests
     public bool CommandValidationConsistency(int x, int y, NonNegativeInt delayMs)
     {
         var delay = TimeSpan.FromMilliseconds(delayMs.Get);
-        
+
         // Test MouseMoveCommand validation
         var mouseMoveValid = new MouseMoveCommand(new Point(Math.Abs(x), Math.Abs(y))) { Delay = delay };
         var mouseMoveInvalid = new MouseMoveCommand(new Point(-1, -1)) { Delay = delay };
-        
+
         if (mouseMoveValid.IsValid() != true || mouseMoveInvalid.IsValid() != false)
             return false;
 
         // Test MouseClickCommand validation
         var mouseClickValid = new MouseClickCommand(MouseButton.Left, ClickType.Click) { Delay = delay };
         var mouseClickInvalid = new MouseClickCommand((MouseButton)999, ClickType.Click) { Delay = delay };
-        
+
         if (mouseClickValid.IsValid() != true || mouseClickInvalid.IsValid() != false)
             return false;
 
         // Test KeyboardCommand validation
         var keyboardValid = new KeyboardCommand("Hello") { Delay = delay };
         var keyboardInvalid = new KeyboardCommand("") { Delay = delay };
-        
+
         if (keyboardValid.IsValid() != true || keyboardInvalid.IsValid() != false)
             return false;
 
         // Test SleepCommand validation
         var sleepValid = new SleepCommand(TimeSpan.FromMilliseconds(Math.Abs(delayMs.Get))) { Delay = delay };
         var sleepInvalid = new SleepCommand(TimeSpan.FromMilliseconds(-1)) { Delay = delay };
-        
+
         if (sleepValid.IsValid() != true || sleepInvalid.IsValid() != false)
             return false;
 

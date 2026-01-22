@@ -116,7 +116,7 @@ public class ScriptTests
         var command1 = new MouseMoveCommand(new Point(100, 200));
         var command2 = new MouseClickCommand(MouseButton.Left, ClickType.Click);
         var command3 = new SleepCommand(TimeSpan.FromMilliseconds(500));
-        
+
         script.AddCommand(command1);
         script.AddCommand(command3);
 
@@ -171,7 +171,7 @@ public class ScriptTests
         var command1 = new MouseMoveCommand(new Point(100, 200));
         var command2 = new MouseClickCommand(MouseButton.Left, ClickType.Click);
         var command3 = new SleepCommand(TimeSpan.FromMilliseconds(500));
-        
+
         script.AddCommand(command1);
         script.AddCommand(command2);
         script.AddCommand(command3);
@@ -217,11 +217,11 @@ public class ScriptTests
         Assert.NotEqual(originalScript.Id, duplicatedScript.Id);
         Assert.Equal("Duplicated Script", duplicatedScript.Name);
         Assert.Equal(originalScript.CommandCount, duplicatedScript.CommandCount);
-        
+
         // Commands should be clones, not the same instances
         Assert.NotEqual(originalScript.Commands[0].Id, duplicatedScript.Commands[0].Id);
         Assert.NotEqual(originalScript.Commands[1].Id, duplicatedScript.Commands[1].Id);
-        
+
         // But they should have the same type and parameters
         Assert.IsType<MouseMoveCommand>(duplicatedScript.Commands[0]);
         Assert.IsType<MouseClickCommand>(duplicatedScript.Commands[1]);

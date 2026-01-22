@@ -264,7 +264,7 @@ public class CommandTests
         // Assert
         Assert.NotEqual(originalCommand.Id, clonedCommand.Id);
         Assert.IsType<MouseMoveCommand>(clonedCommand);
-        
+
         var clonedMouseMove = (MouseMoveCommand)clonedCommand;
         Assert.Equal(originalCommand.Position, clonedMouseMove.Position);
         Assert.Equal(originalCommand.Delay, clonedMouseMove.Delay);

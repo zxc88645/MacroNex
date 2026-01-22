@@ -362,7 +362,7 @@ public class Win32GlobalHotkeyServiceTests : IDisposable
         {
             // Ignore cleanup errors
         }
-        
+
         _hotkeyService?.Dispose();
     }
 
@@ -408,14 +408,14 @@ public class Win32GlobalHotkeyServiceTests : IDisposable
                     return true;
                 }
             }
-            
+
             msg = default;
             return false;
         }
 
         public bool TranslateMessage(ref MSG msg) => true;
         public IntPtr DispatchMessage(ref MSG msg) => IntPtr.Zero;
-        
+
         public bool PostThreadMessage(uint idThread, uint msg, IntPtr wParam, IntPtr lParam)
         {
             lock (_lockObject)
@@ -433,7 +433,7 @@ public class Win32GlobalHotkeyServiceTests : IDisposable
                 return true;
             }
         }
-        
+
         public uint GetCurrentThreadId() => _currentThreadId;
         public uint GetLastError() => _lastError;
     }

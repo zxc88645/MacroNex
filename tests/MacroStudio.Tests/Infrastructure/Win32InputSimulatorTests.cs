@@ -77,7 +77,7 @@ public class Win32InputSimulatorTests : IDisposable
         var invalidButton = (MouseButton)999;
 
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() =>
             _inputSimulator.SimulateMouseClickAsync(invalidButton, ClickType.Click));
     }
 
@@ -88,7 +88,7 @@ public class Win32InputSimulatorTests : IDisposable
         var invalidClickType = (ClickType)999;
 
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() =>
             _inputSimulator.SimulateMouseClickAsync(MouseButton.Left, invalidClickType));
     }
 
@@ -114,7 +114,7 @@ public class Win32InputSimulatorTests : IDisposable
         var invalidKey = (VirtualKey)999999;
 
         // Act & Assert
-        await Assert.ThrowsAsync<ArgumentException>(() => 
+        await Assert.ThrowsAsync<ArgumentException>(() =>
             _inputSimulator.SimulateKeyPressAsync(invalidKey, true));
     }
 
@@ -215,7 +215,7 @@ public class Win32InputSimulatorTests : IDisposable
         _inputSimulator.Dispose();
 
         // Act & Assert
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => 
+        await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             _inputSimulator.SimulateMouseClickAsync(MouseButton.Left, ClickType.Click));
     }
 
@@ -236,7 +236,7 @@ public class Win32InputSimulatorTests : IDisposable
         _inputSimulator.Dispose();
 
         // Act & Assert
-        await Assert.ThrowsAsync<ObjectDisposedException>(() => 
+        await Assert.ThrowsAsync<ObjectDisposedException>(() =>
             _inputSimulator.SimulateKeyPressAsync(VirtualKey.VK_A, true));
     }
 

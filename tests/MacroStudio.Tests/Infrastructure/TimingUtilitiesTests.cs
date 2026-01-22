@@ -272,15 +272,15 @@ public class TimingUtilitiesTests
         Assert.True(pressDelay.TotalMilliseconds > 0);
         Assert.True(holdDelay.TotalMilliseconds > 0);
         Assert.True(releaseDelay.TotalMilliseconds > 0);
-        
+
         // Press delay should be around 20ms base
         Assert.True(pressDelay.TotalMilliseconds >= 20.0);
         Assert.True(pressDelay.TotalMilliseconds <= 40.0);
-        
+
         // Hold delay should be around 50ms base
         Assert.True(holdDelay.TotalMilliseconds >= 50.0);
         Assert.True(holdDelay.TotalMilliseconds <= 80.0);
-        
+
         // Release delay should be around 15ms base
         Assert.True(releaseDelay.TotalMilliseconds >= 15.0);
         Assert.True(releaseDelay.TotalMilliseconds <= 35.0);

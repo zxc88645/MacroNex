@@ -118,10 +118,10 @@ public class ExecutionServicePropertyTests
         {
             // 啟動腳本（異步啟動，不等待完成）
             var startTask = service.StartExecutionAsync(script, options);
-            
+
             // 等待一小段時間確保腳本已開始執行
             Thread.Sleep(100);
-            
+
             // 檢查腳本是否正在執行
             if (service.State != ExecutionState.Running)
             {
@@ -129,7 +129,7 @@ public class ExecutionServicePropertyTests
                 startTask.GetAwaiter().GetResult(); // 等待完成
                 return true; // 跳過這個測試用例
             }
-            
+
             // 現在腳本應該正在執行，嘗試再次啟動同一個腳本應該拋出異常
             bool exceptionThrown = false;
             try
@@ -193,7 +193,7 @@ public class ExecutionServicePropertyTests
         {
             // 啟動第一個腳本
             service.StartExecutionAsync(script1, options).GetAwaiter().GetResult();
-            
+
             // 稍微等待確保第一個腳本已啟動
             Thread.Sleep(50);
 

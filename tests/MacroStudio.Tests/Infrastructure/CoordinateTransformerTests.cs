@@ -149,7 +149,7 @@ public class CoordinateTransformerTests
         // Assert
         Assert.True(point.X >= 0);
         Assert.True(point.Y >= 0);
-        
+
         var screenDimensions = _transformer.GetScreenDimensions();
         Assert.True(point.X <= screenDimensions.X);
         Assert.True(point.Y <= screenDimensions.Y);
