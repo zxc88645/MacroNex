@@ -8,7 +8,6 @@ using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
 using MacroStudio.Presentation.SyntaxHighlighting;
 using MacroStudio.Presentation.Views;
-using System.Collections.ObjectModel;
 using MoonSharp.Interpreter;
 using LuaScript = MoonSharp.Interpreter.Script;
 using Script = MacroStudio.Domain.Entities.Script;
@@ -18,7 +17,7 @@ using Point = MacroStudio.Domain.ValueObjects.Point;
 namespace MacroStudio.Presentation.ViewModels;
 
 /// <summary>
-/// ViewModel for displaying and editing the command list of a selected script.
+/// ViewModel for displaying and editing script source text.
 /// </summary>
 public partial class CommandGridViewModel : ObservableObject
 {
@@ -29,8 +28,6 @@ public partial class CommandGridViewModel : ObservableObject
     private string _originalScriptText = string.Empty;
     private readonly DispatcherTimer _autoSaveTimer;
     private int _pendingVersion;
-
-    public ObservableCollection<Command> Commands { get; } = new();
 
     // Updated by the view (AvalonEdit) so we can insert snippets at the caret.
     [ObservableProperty]
@@ -104,7 +101,6 @@ public partial class CommandGridViewModel : ObservableObject
     public void LoadScript(Script? script)
     {
         CurrentScript = script;
-        Commands.Clear();
         if (script == null)
         {
             _isUpdatingDocument = true;
@@ -117,15 +113,8 @@ public partial class CommandGridViewModel : ObservableObject
             return;
         }
         
-        foreach (var cmd in script.Commands)
-            Commands.Add(cmd);
-
-        // Lua-only editor: SourceText is the primary representation.
-        // If empty (e.g. legacy/recorded script), fall back to a sequence of host API calls
-        // which is valid Lua as well.
-        var text = string.IsNullOrWhiteSpace(script.SourceText)
-            ? ScriptTextConverter.ToText(script)
-            : script.SourceText;
+        // All scripts must have SourceText for execution
+        var text = script.SourceText ?? string.Empty;
         _isUpdatingDocument = true;
         Document.Text = text;
         _originalScriptText = text;
@@ -269,7 +258,7 @@ public partial class CommandGridViewModel : ObservableObject
         await _loggingService.LogInfoAsync(logMessage, new Dictionary<string, object>
         {
             { "ScriptId", CurrentScript.Id },
-            { "CommandCount", CurrentScript.CommandCount }
+            { "SourceTextLength", CurrentScript.SourceTextLength }
         });
 
         LoadScript(CurrentScript);

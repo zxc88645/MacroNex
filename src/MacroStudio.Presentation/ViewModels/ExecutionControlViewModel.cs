@@ -35,9 +35,6 @@ public partial class ExecutionControlViewModel : ObservableObject
     private double completionPercentage;
 
     [ObservableProperty]
-    private double speedMultiplier = 1.0;
-
-    [ObservableProperty]
     private bool showCountdown = true;
 
     [ObservableProperty]
@@ -110,7 +107,6 @@ public partial class ExecutionControlViewModel : ObservableObject
     private async Task LoadDefaultsAsync()
     {
         var settings = await _settingsService.LoadAsync();
-        SpeedMultiplier = settings.DefaultSpeedMultiplier;
         ShowCountdown = settings.ShowCountdown;
         CountdownSeconds = settings.CountdownSeconds <= 0 ? 3 : settings.CountdownSeconds;
     }
@@ -159,7 +155,6 @@ public partial class ExecutionControlViewModel : ObservableObject
         var options = ExecutionOptions.Default();
         options.TriggerSource = ExecutionTriggerSource.DebugPanel;
         options.ControlMode = ExecutionControlMode.DebugInteractive;
-        options.SpeedMultiplier = SpeedMultiplier <= 0 ? 1.0 : SpeedMultiplier;
         options.ShowCountdown = false; // UI handles countdown (focus warning)
         options.CountdownDuration = TimeSpan.Zero;
 
@@ -173,7 +168,6 @@ public partial class ExecutionControlViewModel : ObservableObject
         {
             { "ScriptId", Script.Id },
             { "ScriptName", Script.Name },
-            { "SpeedMultiplier", options.SpeedMultiplier },
             { "ShowCountdown", ShowCountdown },
             { "CountdownSeconds", CountdownDuration.TotalSeconds }
         });

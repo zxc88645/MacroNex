@@ -95,10 +95,6 @@
 
                                     <GroupBox Header="{DynamicResource Ui.Execution.Options}" Padding="10" BorderBrush="{DynamicResource BorderBrushSoft}" Foreground="{DynamicResource TextMutedBrush}">
                                         <StackPanel>
-                                            <DockPanel Margin="0,0,0,6">
-                                                <TextBlock Width="120" Text="{DynamicResource Ui.Execution.Speed}" VerticalAlignment="Center"/>
-                                                <TextBox Text="{Binding ExecutionControls.SpeedMultiplier, UpdateSourceTrigger=PropertyChanged}" />
-                                            </DockPanel>
                                             <CheckBox Content="{DynamicResource Ui.Execution.ShowCountdown}" IsChecked="{Binding ExecutionControls.ShowCountdown}" />
                                             <DockPanel Margin="0,6,0,0">
                                                 <TextBlock Width="120" Text="{DynamicResource Ui.Execution.CountdownSeconds}" VerticalAlignment="Center"/>
