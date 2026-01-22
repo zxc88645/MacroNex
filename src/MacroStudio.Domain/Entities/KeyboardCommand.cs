@@ -83,7 +83,7 @@ public class KeyboardCommand : Command
     /// <param name="createdAt">The timestamp when this command was created.</param>
     /// <param name="text">The text to be typed (can be null).</param>
     /// <param name="keys">The virtual keys to be pressed.</param>
-    public KeyboardCommand(Guid id, TimeSpan delay, DateTime createdAt, string? text, IEnumerable<VirtualKey> keys) 
+    public KeyboardCommand(Guid id, TimeSpan delay, DateTime createdAt, string? text, IEnumerable<VirtualKey> keys)
         : base(id, delay, createdAt)
     {
         Text = text;

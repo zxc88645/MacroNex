@@ -103,7 +103,7 @@ public class DomainValidationResult
         IsValid = isValid;
         Errors = errors.ToList().AsReadOnly();
         Warnings = warnings.ToList().AsReadOnly();
-        
+
         if (Errors.Any())
             Severity = ValidationSeverity.Error;
         else if (Warnings.Any())

@@ -38,7 +38,7 @@ public class MouseMoveCommand : Command
     /// <param name="delay">The delay before executing this command.</param>
     /// <param name="createdAt">The timestamp when this command was created.</param>
     /// <param name="position">The target position to move the mouse to.</param>
-    public MouseMoveCommand(Guid id, TimeSpan delay, DateTime createdAt, Point position) 
+    public MouseMoveCommand(Guid id, TimeSpan delay, DateTime createdAt, Point position)
         : base(id, delay, createdAt)
     {
         Position = position;

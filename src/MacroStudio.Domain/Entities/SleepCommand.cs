@@ -36,7 +36,7 @@ public class SleepCommand : Command
     /// <param name="delay">The delay before executing this command.</param>
     /// <param name="createdAt">The timestamp when this command was created.</param>
     /// <param name="duration">The duration to sleep.</param>
-    public SleepCommand(Guid id, TimeSpan delay, DateTime createdAt, TimeSpan duration) 
+    public SleepCommand(Guid id, TimeSpan delay, DateTime createdAt, TimeSpan duration)
         : base(id, delay, createdAt)
     {
         Duration = duration;

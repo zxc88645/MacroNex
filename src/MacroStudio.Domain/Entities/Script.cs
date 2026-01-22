@@ -19,14 +19,14 @@ public class Script
     /// <summary>
     /// The display name of the script.
     /// </summary>
-    public string Name 
-    { 
+    public string Name
+    {
         get => _name;
         set
         {
             if (string.IsNullOrWhiteSpace(value))
                 throw new ArgumentException("Script name cannot be null or empty.", nameof(value));
-            
+
             _name = value.Trim();
             ModifiedAt = DateTime.UtcNow;
         }

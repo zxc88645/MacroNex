@@ -134,7 +134,7 @@ public record HotkeyDefinition
             VirtualKey.VK_APPS => "Menu",
             VirtualKey.VK_NUMLOCK => "Num Lock",
             VirtualKey.VK_SCROLL => "Scroll Lock",
-            
+
             // Number keys
             VirtualKey.VK_0 => "0",
             VirtualKey.VK_1 => "1",
@@ -146,7 +146,7 @@ public record HotkeyDefinition
             VirtualKey.VK_7 => "7",
             VirtualKey.VK_8 => "8",
             VirtualKey.VK_9 => "9",
-            
+
             // Letter keys
             VirtualKey.VK_A => "A",
             VirtualKey.VK_B => "B",
@@ -174,7 +174,7 @@ public record HotkeyDefinition
             VirtualKey.VK_X => "X",
             VirtualKey.VK_Y => "Y",
             VirtualKey.VK_Z => "Z",
-            
+
             // Function keys
             VirtualKey.VK_F1 => "F1",
             VirtualKey.VK_F2 => "F2",
@@ -188,7 +188,7 @@ public record HotkeyDefinition
             VirtualKey.VK_F10 => "F10",
             VirtualKey.VK_F11 => "F11",
             VirtualKey.VK_F12 => "F12",
-            
+
             // Numpad keys
             VirtualKey.VK_NUMPAD0 => "Num 0",
             VirtualKey.VK_NUMPAD1 => "Num 1",
@@ -205,7 +205,7 @@ public record HotkeyDefinition
             VirtualKey.VK_SUBTRACT => "Num -",
             VirtualKey.VK_DECIMAL => "Num .",
             VirtualKey.VK_DIVIDE => "Num /",
-            
+
             _ => key.ToString().Replace("VK_", "")
         };
     }

@@ -430,7 +430,7 @@ public class ExecutionCompletedEventArgs : DomainEventArgs
     /// <param name="success">Whether execution was successful.</param>
     /// <param name="reason">Reason for completion.</param>
     /// <param name="error">Error that occurred, if any.</param>
-    public ExecutionCompletedEventArgs(Guid sessionId, ExecutionState finalState, int executedCommandCount, int totalCommandCount, 
+    public ExecutionCompletedEventArgs(Guid sessionId, ExecutionState finalState, int executedCommandCount, int totalCommandCount,
         TimeSpan totalExecutionTime, bool success, string reason, Exception? error = null)
     {
         SessionId = sessionId;

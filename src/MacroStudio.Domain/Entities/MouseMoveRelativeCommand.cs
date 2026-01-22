@@ -44,7 +44,7 @@ public class MouseMoveRelativeCommand : Command
     /// <param name="createdAt">The timestamp when this command was created.</param>
     /// <param name="deltaX">The horizontal displacement in pixels.</param>
     /// <param name="deltaY">The vertical displacement in pixels.</param>
-    public MouseMoveRelativeCommand(Guid id, TimeSpan delay, DateTime createdAt, int deltaX, int deltaY) 
+    public MouseMoveRelativeCommand(Guid id, TimeSpan delay, DateTime createdAt, int deltaX, int deltaY)
         : base(id, delay, createdAt)
     {
         DeltaX = deltaX;
