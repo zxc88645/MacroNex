@@ -136,6 +136,11 @@
                 </Setter>
             </Style>
 
+            <!-- CheckBox (dark theme) -->
+            <Style TargetType="{x:Type CheckBox}">
+                <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+            </Style>
+
             <!-- ComboBox (dark theme) -->
             <Style TargetType="{x:Type ComboBox}">
                 <!-- Keep dropdown/popup colors aligned with theme even if default template uses SystemColors -->
