@@ -83,7 +83,7 @@ public partial class LoggingViewModel : ObservableObject
             {
                 Entries.Clear();
             }
-            
+
             // 然後清空服務層的日誌（這會觸發 LogEntryCreated 事件，但由於 _isClearing 為 true，不會添加）
             await _loggingService.ClearLogsAsync();
         }

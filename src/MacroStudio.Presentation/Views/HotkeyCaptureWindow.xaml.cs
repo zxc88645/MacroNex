@@ -18,7 +18,7 @@ public partial class HotkeyCaptureWindow : Window
     public HotkeyCaptureWindow(HotkeyDefinition? existingHotkey = null)
     {
         InitializeComponent();
-        
+
         if (existingHotkey != null)
         {
             _currentModifiers = existingHotkey.Modifiers;
@@ -26,7 +26,7 @@ public partial class HotkeyCaptureWindow : Window
             _selectedTriggerMode = existingHotkey.TriggerMode;
             _swallowKeystroke = existingHotkey.SwallowKeystroke;
             SwallowKeystrokeCheck.IsChecked = _swallowKeystroke;
-            
+
             // Update radio buttons based on existing hotkey mode
             if (_selectedTriggerMode == HotkeyTriggerMode.RepeatWhileHeld)
             {
@@ -36,7 +36,7 @@ public partial class HotkeyCaptureWindow : Window
             {
                 OnceModeRadio.IsChecked = true;
             }
-            
+
             UpdateDisplay();
         }
 
@@ -63,7 +63,7 @@ public partial class HotkeyCaptureWindow : Window
 
         // Convert WPF Key to VirtualKey
         var virtualKey = ConvertWpfKeyToVirtualKey(e.Key);
-        
+
         // Ignore modifier keys as the main key
         if (virtualKey.HasValue && !IsModifierKey(virtualKey.Value))
         {
@@ -196,7 +196,7 @@ public partial class HotkeyCaptureWindow : Window
                 _selectedTriggerMode,
                 SwallowKeystrokeCheck.IsChecked == true
             );
-            
+
             if (hotkey.IsValid())
             {
                 HotkeyDisplayText.Text = hotkey.GetDisplayString();
@@ -257,7 +257,7 @@ public partial class HotkeyCaptureWindow : Window
                 _selectedTriggerMode,
                 SwallowKeystrokeCheck.IsChecked == true
             );
-            
+
             if (ResultHotkey.IsValid())
             {
                 DialogResult = true;

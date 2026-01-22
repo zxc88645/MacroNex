@@ -88,7 +88,7 @@ public partial class CommandGridViewModel : ObservableObject
 
         Document = new TextDocument();
         Document.TextChanged += OnDocumentTextChanged;
-        
+
         SyntaxHighlighting = MacroScriptSyntaxMode.GetHighlightingDefinition();
 
         _autoSaveTimer = new DispatcherTimer
@@ -112,7 +112,7 @@ public partial class CommandGridViewModel : ObservableObject
             EditorStatusText = string.Empty;
             return;
         }
-        
+
         // All scripts must have SourceText for execution
         var text = script.SourceText ?? string.Empty;
         _isUpdatingDocument = true;
@@ -127,9 +127,9 @@ public partial class CommandGridViewModel : ObservableObject
     private void OnDocumentTextChanged(object? sender, EventArgs e)
     {
         if (_isUpdatingDocument) return;
-        
+
         ScriptText = Document.Text;
-        
+
         // Check if text has changed from original
         HasUnsavedChanges = CurrentScript != null && Document.Text != _originalScriptText;
         if (HasUnsavedChanges)
@@ -165,7 +165,7 @@ public partial class CommandGridViewModel : ObservableObject
             return;
 
         var text = dlg.ValueText?.Trim() ?? string.Empty;
-        
+
         // Validate that text is not empty
         if (string.IsNullOrEmpty(text))
         {

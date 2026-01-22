@@ -273,7 +273,7 @@ public partial class MainViewModel : ObservableObject
 
         // Hook-based script hotkeys: just ask ScriptManager to rebuild the mapping for the hook service.
         await _scriptManager.RegisterAllScriptHotkeysAsync();
-        
+
         StatusText = UiText.Get("Ui.Status.LoadedScripts", "Loaded scripts");
     }
 

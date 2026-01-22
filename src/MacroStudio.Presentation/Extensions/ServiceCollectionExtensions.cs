@@ -24,16 +24,16 @@ public static class ServiceCollectionExtensions
     {
         // Register presentation layer services
         services.AddPresentationServices();
-        
+
         // Register application layer services
         services.AddApplicationServices();
-        
+
         // Register infrastructure layer services (adapters)
         services.AddInfrastructureServices();
-        
+
         return services;
     }
-    
+
     /// <summary>
     /// Registers presentation layer services (ViewModels, Views).
     /// </summary>
@@ -52,10 +52,10 @@ public static class ServiceCollectionExtensions
 
         // UI coordinators
         services.AddHostedService<SafetyUiCoordinator>();
-        
+
         return services;
     }
-    
+
     /// <summary>
     /// Registers application layer services (Use Cases, Application Services).
     /// </summary>
@@ -68,10 +68,10 @@ public static class ServiceCollectionExtensions
         services.AddScoped<IExecutionService, ExecutionService>();
         services.AddScoped<LuaScriptRunner>();
         services.AddSingleton<ILoggingService, LoggingService>();
-        
+
         return services;
     }
-    
+
     /// <summary>
     /// Registers infrastructure layer services (Adapters implementing domain interfaces).
     /// </summary>
@@ -84,17 +84,17 @@ public static class ServiceCollectionExtensions
 
         // Register input hook service for recording
         services.AddSingleton<IInputHookService, Win32InputHookService>();
-        
+
         // Register global hotkey service
         services.AddSingleton<IGlobalHotkeyService, Win32GlobalHotkeyService>();
         services.AddSingleton<IRecordingHotkeyHookService, Win32RecordingHotkeyHookService>();
         services.AddSingleton<IScriptHotkeyHookService, Win32ScriptHotkeyHookService>();
-        
+
         // Register storage services
         services.AddScoped<IFileStorageService, JsonFileStorageService>();
         services.AddSingleton<IFileLogWriter, FileLogWriter>();
         services.AddSingleton<ISettingsService, JsonSettingsService>();
-        
+
         return services;
     }
 }

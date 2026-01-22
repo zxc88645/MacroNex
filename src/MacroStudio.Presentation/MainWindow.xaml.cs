@@ -14,7 +14,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
         DataContext = mainViewModel ?? throw new ArgumentNullException(nameof(mainViewModel));
-        
+
         // Subscribe to log entries collection changes to auto-scroll
         if (mainViewModel.Logging?.Entries is INotifyCollectionChanged notifyCollection)
         {

@@ -305,7 +305,7 @@ public partial class RecordingViewModel : ObservableObject
         }
 
         var script = await _scriptManager.CreateScriptAsync(name);
-        
+
         script.SourceText = ScriptTextConverter.CommandsToText(RecordedCommands);
 
         await _scriptManager.UpdateScriptAsync(script);

@@ -110,7 +110,7 @@ public partial class App : System.Windows.Application
             {
                 // Register all MacroStudio services
                 services.AddMacroStudioServices();
-                
+
                 // Register the main window
                 services.AddSingleton<MainWindow>();
             });

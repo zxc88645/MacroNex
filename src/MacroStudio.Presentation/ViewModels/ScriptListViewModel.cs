@@ -158,13 +158,13 @@ public partial class ScriptListViewModel : ObservableObject
                 var scriptId = SelectedScript.Id;
                 SelectedScript.TriggerHotkey = dialog.ResultHotkey;
                 await _scriptManager.UpdateScriptAsync(SelectedScript);
-                
+
                 // Script is a domain entity (no INotifyPropertyChanged), so changing TriggerHotkey won't
                 // automatically refresh the ListBox item template. The most reliable fix is to run the same
                 // reload path as the "Refresh" button (clear + reload from storage), then restore selection.
                 await RefreshAsync();
                 SelectedScript = Scripts.FirstOrDefault(s => s.Id == scriptId) ?? Scripts.FirstOrDefault();
-                
+
                 // Selection might be null if there are no scripts loaded; avoid null dereference.
                 var selected = SelectedScript;
 
