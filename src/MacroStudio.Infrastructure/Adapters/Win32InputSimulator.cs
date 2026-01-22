@@ -74,6 +74,67 @@ public class Win32InputSimulator : IInputSimulator
     }
 
     /// <inheritdoc />
+    public async Task SimulateMouseMoveRelativeAsync(int deltaX, int deltaY)
+    {
+        ThrowIfDisposed();
+        ValidateRelativeDelta(deltaX, deltaY);
+
+        _logger.LogDebug("Simulating relative mouse move by ({DeltaX}, {DeltaY})", deltaX, deltaY);
+
+        await Task.Run(() =>
+        {
+            lock (_lockObject)
+            {
+                // Get current position and calculate new position
+                if (!GetCursorPos(out POINT currentPoint))
+                {
+                    var error = GetLastError();
+                    _logger.LogError("Failed to get cursor position for relative move. Win32 error: {Error}", error);
+                    throw new InputSimulationException("Failed to get cursor position for relative move", (int)error);
+                }
+
+                var newX = currentPoint.X + deltaX;
+                var newY = currentPoint.Y + deltaY;
+
+                // Clamp to screen bounds
+                var screenWidth = GetSystemMetrics(SM_CXSCREEN);
+                var screenHeight = GetSystemMetrics(SM_CYSCREEN);
+                newX = Math.Clamp(newX, 0, screenWidth - 1);
+                newY = Math.Clamp(newY, 0, screenHeight - 1);
+
+                if (!SetCursorPos(newX, newY))
+                {
+                    var error = GetLastError();
+                    _logger.LogError("Failed to move cursor relative. Win32 error: {Error}", error);
+                    throw new InputSimulationException($"Failed to move cursor relative by ({deltaX}, {deltaY})", (int)error);
+                }
+
+                _logger.LogTrace("Successfully moved cursor relative by ({DeltaX}, {DeltaY})", deltaX, deltaY);
+            }
+        });
+    }
+
+    /// <inheritdoc />
+    public async Task SimulateMouseMoveRelativeLowLevelAsync(int deltaX, int deltaY)
+    {
+        ThrowIfDisposed();
+        ValidateRelativeDelta(deltaX, deltaY);
+
+        _logger.LogDebug("Simulating low-level relative mouse move by ({DeltaX}, {DeltaY})", deltaX, deltaY);
+
+        await Task.Run(() =>
+        {
+            lock (_lockObject)
+            {
+                // SendInput relative move (using MOUSEEVENTF_MOVE without MOUSEEVENTF_ABSOLUTE)
+                var input = CreateRelativeMouseMoveInput(deltaX, deltaY);
+                SendInputs(new[] { input });
+                _logger.LogTrace("Successfully sent low-level relative move by ({DeltaX}, {DeltaY})", deltaX, deltaY);
+            }
+        });
+    }
+
+    /// <inheritdoc />
     public async Task SimulateMouseClickAsync(MouseButton button, ClickType type)
     {
         ThrowIfDisposed();
@@ -422,6 +483,32 @@ public class Win32InputSimulator : IInputSimulator
     }
 
     /// <summary>
+    /// Creates a relative mouse move input structure.
+    /// </summary>
+    /// <param name="deltaX">The horizontal displacement in pixels.</param>
+    /// <param name="deltaY">The vertical displacement in pixels.</param>
+    /// <returns>INPUT structure for relative mouse movement.</returns>
+    private INPUT CreateRelativeMouseMoveInput(int deltaX, int deltaY)
+    {
+        return new INPUT
+        {
+            type = INPUT_MOUSE,
+            u = new InputUnion
+            {
+                mi = new MOUSEINPUT
+                {
+                    dx = deltaX,
+                    dy = deltaY,
+                    mouseData = 0,
+                    dwFlags = MOUSEEVENTF_MOVE, // No MOUSEEVENTF_ABSOLUTE flag for relative movement
+                    time = 0,
+                    dwExtraInfo = IntPtr.Zero
+                }
+            }
+        };
+    }
+
+    /// <summary>
     /// Gets the Win32 mouse event flags for the specified button.
     /// </summary>
     /// <param name="button">The mouse button.</param>
@@ -513,6 +600,27 @@ public class Win32InputSimulator : IInputSimulator
         if (!Enum.IsDefined(typeof(VirtualKey), key))
         {
             throw new ArgumentException($"Invalid virtual key: {key}", nameof(key));
+        }
+    }
+
+    /// <summary>
+    /// Validates that the relative delta values are within acceptable range.
+    /// </summary>
+    /// <param name="deltaX">The horizontal displacement to validate.</param>
+    /// <param name="deltaY">The vertical displacement to validate.</param>
+    private void ValidateRelativeDelta(int deltaX, int deltaY)
+    {
+        const int maxDelta = 32767;
+        const int minDelta = -32768;
+
+        if (deltaX < minDelta || deltaX > maxDelta)
+        {
+            throw new ArgumentException($"DeltaX must be between {minDelta} and {maxDelta}. Got: {deltaX}", nameof(deltaX));
+        }
+
+        if (deltaY < minDelta || deltaY > maxDelta)
+        {
+            throw new ArgumentException($"DeltaY must be between {minDelta} and {maxDelta}. Got: {deltaY}", nameof(deltaY));
         }
     }
 
