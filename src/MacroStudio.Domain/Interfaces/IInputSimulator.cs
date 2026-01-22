@@ -24,6 +24,27 @@ public interface IInputSimulator
     Task SimulateMouseMoveLowLevelAsync(Point position);
 
     /// <summary>
+    /// Simulates moving the mouse cursor relative to its current position.
+    /// </summary>
+    /// <param name="deltaX">The horizontal displacement in pixels. Can be negative.</param>
+    /// <param name="deltaY">The vertical displacement in pixels. Can be negative.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <exception cref="ArgumentException">Thrown when delta values are out of valid range.</exception>
+    /// <exception cref="InputSimulationException">Thrown when input simulation fails.</exception>
+    Task SimulateMouseMoveRelativeAsync(int deltaX, int deltaY);
+
+    /// <summary>
+    /// Simulates moving the mouse cursor relative to its current position using a lower-level injected method (e.g., SendInput).
+    /// This can work better in some games than direct cursor positioning.
+    /// </summary>
+    /// <param name="deltaX">The horizontal displacement in pixels. Can be negative.</param>
+    /// <param name="deltaY">The vertical displacement in pixels. Can be negative.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    /// <exception cref="ArgumentException">Thrown when delta values are out of valid range.</exception>
+    /// <exception cref="InputSimulationException">Thrown when input simulation fails.</exception>
+    Task SimulateMouseMoveRelativeLowLevelAsync(int deltaX, int deltaY);
+
+    /// <summary>
     /// Simulates a mouse click action using the current cursor position.
     /// </summary>
     /// <param name="button">The mouse button to click.</param>

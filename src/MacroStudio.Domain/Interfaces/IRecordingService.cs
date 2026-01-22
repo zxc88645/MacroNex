@@ -182,6 +182,11 @@ public class RecordingOptions
     public bool UseLowLevelMouseMove { get; set; } = true;
 
     /// <summary>
+    /// Whether to record mouse movements as relative displacements instead of absolute positions.
+    /// </summary>
+    public bool UseRelativeMouseMove { get; set; } = false;
+
+    /// <summary>
     /// Whether to record mouse clicks.
     /// </summary>
     public bool RecordMouseClicks { get; set; } = true;
