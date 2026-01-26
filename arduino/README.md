@@ -51,6 +51,11 @@ PlatformIO 是一個跨平台的嵌入式開發工具，提供更好的依賴管
 
 項目已包含 `platformio.ini` 配置文件，會自動安裝所需的庫。
 
+5. **運行測試**
+   ```bash
+   pio test -e native
+   ```
+
 ### 使用 Arduino IDE
 
 在 Arduino IDE 中安裝以下庫：
