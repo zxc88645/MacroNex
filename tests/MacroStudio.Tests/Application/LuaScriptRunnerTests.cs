@@ -20,7 +20,8 @@ public class LuaScriptRunnerTests
         input.Setup(i => i.SimulateKeyPressAsync(VirtualKey.VK_A, true)).Returns(Task.CompletedTask);
         input.Setup(i => i.SimulateKeyPressAsync(VirtualKey.VK_A, false)).Returns(Task.CompletedTask);
 
-        var runner = new LuaScriptRunner(input.Object, safety, NullLogger<LuaScriptRunner>.Instance);
+        var inputSimulatorFactory = new FakeInputSimulatorFactory(input.Object);
+        var runner = new LuaScriptRunner(inputSimulatorFactory, safety, NullLogger<LuaScriptRunner>.Instance);
 
         var lua = @"
 move(10, 20)
@@ -30,9 +31,24 @@ key_down('a')
 key_release('a')
 ";
 
-        await runner.RunAsync(lua, CancellationToken.None);
+        await runner.RunAsync(lua, CancellationToken.None, inputMode: InputMode.Software);
 
         input.VerifyAll();
+    }
+
+    private sealed class FakeInputSimulatorFactory : IInputSimulatorFactory
+    {
+        private readonly IInputSimulator _inputSimulator;
+
+        public FakeInputSimulatorFactory(IInputSimulator inputSimulator)
+        {
+            _inputSimulator = inputSimulator;
+        }
+
+        public IInputSimulator GetInputSimulator(InputMode mode)
+        {
+            return _inputSimulator;
+        }
     }
 }
 

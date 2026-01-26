@@ -5,6 +5,7 @@ using MacroStudio.Domain.Entities;
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
 using Microsoft.Extensions.Logging.Abstractions;
+using MacroStudio.Infrastructure.Adapters;
 
 namespace MacroStudio.Tests.Application;
 
@@ -18,10 +19,12 @@ public class UiResponsivenessPropertyTests
         if (string.IsNullOrWhiteSpace(name)) return true;
 
         var input = new FakeInputSimulator();
+        var inputSimulatorFactory = new FakeInputSimulatorFactory(input);
+        var arduinoConnectionService = new ArduinoConnectionService(new FakeArduinoService(), NullLogger<ArduinoConnectionService>.Instance);
         var hotkeys = new FakeGlobalHotkeyService();
         var safety = new SafetyService(NullLogger<SafetyService>.Instance);
-        var lua = new LuaScriptRunner(input, safety, NullLogger<LuaScriptRunner>.Instance);
-        var exec = new ExecutionService(input, hotkeys, safety, lua, NullLogger<ExecutionService>.Instance);
+        var lua = new LuaScriptRunner(inputSimulatorFactory, safety, NullLogger<LuaScriptRunner>.Instance);
+        var exec = new ExecutionService(inputSimulatorFactory, arduinoConnectionService, hotkeys, safety, lua, NullLogger<ExecutionService>.Instance);
 
         // attach handlers that throw - service should swallow in its raise methods
         exec.StateChanged += (_, _) => throw new InvalidOperationException("boom");
@@ -103,6 +106,38 @@ public class UiResponsivenessPropertyTests
         public Task DelayAsync(TimeSpan delay) => Task.CompletedTask;
         public Task<Point> GetCursorPositionAsync() => Task.FromResult(Point.Zero);
         public Task<bool> IsReadyAsync() => Task.FromResult(true);
+    }
+
+    private sealed class FakeInputSimulatorFactory : IInputSimulatorFactory
+    {
+        private readonly IInputSimulator _inputSimulator;
+
+        public FakeInputSimulatorFactory(IInputSimulator inputSimulator)
+        {
+            _inputSimulator = inputSimulator;
+        }
+
+        public IInputSimulator GetInputSimulator(InputMode mode)
+        {
+            return _inputSimulator;
+        }
+    }
+
+
+    private sealed class FakeArduinoService : IArduinoService
+    {
+        public ArduinoConnectionState ConnectionState => ArduinoConnectionState.Disconnected;
+        public bool IsConnected => false;
+        public string? ConnectedPortName => null;
+
+        public event EventHandler<ArduinoConnectionStateChangedEventArgs>? ConnectionStateChanged;
+        public event EventHandler<ArduinoEventReceivedEventArgs>? EventReceived;
+        public event EventHandler<ArduinoErrorEventArgs>? ErrorOccurred;
+
+        public Task<IReadOnlyList<string>> GetAvailablePortsAsync() => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        public Task ConnectAsync(string portName) => Task.CompletedTask;
+        public Task DisconnectAsync() => Task.CompletedTask;
+        public Task SendCommandAsync(ArduinoCommand command) => Task.CompletedTask;
     }
 }
 

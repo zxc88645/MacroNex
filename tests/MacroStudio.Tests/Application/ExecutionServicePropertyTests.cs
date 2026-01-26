@@ -26,10 +26,12 @@ public class ExecutionServicePropertyTests
 
         var logger = NullLogger<ExecutionService>.Instance;
         var inputSimulator = new FakeInputSimulator();
+        var inputSimulatorFactory = new FakeInputSimulatorFactory(inputSimulator);
+        var arduinoConnectionService = new ArduinoConnectionService(new FakeArduinoService(), NullLogger<ArduinoConnectionService>.Instance);
         var hotkeys = new FakeGlobalHotkeyService();
         var safety = new SafetyService(NullLogger<SafetyService>.Instance);
-        var lua = new LuaScriptRunner(inputSimulator, safety, NullLogger<LuaScriptRunner>.Instance);
-        var service = new ExecutionService(inputSimulator, hotkeys, safety, lua, logger);
+        var lua = new LuaScriptRunner(inputSimulatorFactory, safety, NullLogger<LuaScriptRunner>.Instance);
+        var service = new ExecutionService(inputSimulatorFactory, arduinoConnectionService, hotkeys, safety, lua, logger);
 
         var script = CreateScript(name, count);
         var options = ExecutionOptions.Debug();
@@ -105,10 +107,12 @@ public class ExecutionServicePropertyTests
 
         var logger = NullLogger<ExecutionService>.Instance;
         var inputSimulator = new FakeInputSimulator();
+        var inputSimulatorFactory = new FakeInputSimulatorFactory(inputSimulator);
+        var arduinoConnectionService = new ArduinoConnectionService(new FakeArduinoService(), NullLogger<ArduinoConnectionService>.Instance);
         var hotkeys = new FakeGlobalHotkeyService();
         var safety = new SafetyService(NullLogger<SafetyService>.Instance);
-        var lua = new LuaScriptRunner(inputSimulator, safety, NullLogger<LuaScriptRunner>.Instance);
-        var service = new ExecutionService(inputSimulator, hotkeys, safety, lua, logger);
+        var lua = new LuaScriptRunner(inputSimulatorFactory, safety, NullLogger<LuaScriptRunner>.Instance);
+        var service = new ExecutionService(inputSimulatorFactory, arduinoConnectionService, hotkeys, safety, lua, logger);
 
         // 創建一個有足夠命令的腳本，確保執行時間足夠長
         var script = CreateScript(name, 10);
@@ -180,10 +184,12 @@ public class ExecutionServicePropertyTests
 
         var logger = NullLogger<ExecutionService>.Instance;
         var inputSimulator = new FakeInputSimulator();
+        var inputSimulatorFactory = new FakeInputSimulatorFactory(inputSimulator);
+        var arduinoConnectionService = new ArduinoConnectionService(new FakeArduinoService(), NullLogger<ArduinoConnectionService>.Instance);
         var hotkeys = new FakeGlobalHotkeyService();
         var safety = new SafetyService(NullLogger<SafetyService>.Instance);
-        var lua = new LuaScriptRunner(inputSimulator, safety, NullLogger<LuaScriptRunner>.Instance);
-        var service = new ExecutionService(inputSimulator, hotkeys, safety, lua, logger);
+        var lua = new LuaScriptRunner(inputSimulatorFactory, safety, NullLogger<LuaScriptRunner>.Instance);
+        var service = new ExecutionService(inputSimulatorFactory, arduinoConnectionService, hotkeys, safety, lua, logger);
 
         var script1 = CreateScript(name1, 3);
         var script2 = CreateScript(name2, 3);
@@ -277,6 +283,38 @@ public class ExecutionServicePropertyTests
         public Task<Point> GetCursorPositionAsync() => Task.FromResult(new Point(0, 0));
 
         public Task<bool> IsReadyAsync() => Task.FromResult(true);
+    }
+
+    private sealed class FakeInputSimulatorFactory : IInputSimulatorFactory
+    {
+        private readonly IInputSimulator _inputSimulator;
+
+        public FakeInputSimulatorFactory(IInputSimulator inputSimulator)
+        {
+            _inputSimulator = inputSimulator;
+        }
+
+        public IInputSimulator GetInputSimulator(InputMode mode)
+        {
+            return _inputSimulator;
+        }
+    }
+
+
+    private sealed class FakeArduinoService : IArduinoService
+    {
+        public ArduinoConnectionState ConnectionState => ArduinoConnectionState.Disconnected;
+        public bool IsConnected => false;
+        public string? ConnectedPortName => null;
+
+        public event EventHandler<ArduinoConnectionStateChangedEventArgs>? ConnectionStateChanged;
+        public event EventHandler<ArduinoEventReceivedEventArgs>? EventReceived;
+        public event EventHandler<ArduinoErrorEventArgs>? ErrorOccurred;
+
+        public Task<IReadOnlyList<string>> GetAvailablePortsAsync() => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        public Task ConnectAsync(string portName) => Task.CompletedTask;
+        public Task DisconnectAsync() => Task.CompletedTask;
+        public Task SendCommandAsync(ArduinoCommand command) => Task.CompletedTask;
     }
 
     private sealed class FakeGlobalHotkeyService : IGlobalHotkeyService

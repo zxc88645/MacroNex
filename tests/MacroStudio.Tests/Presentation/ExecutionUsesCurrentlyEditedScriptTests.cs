@@ -1,3 +1,4 @@
+using MacroStudio.Application.Services;
 using MacroStudio.Domain.Entities;
 using MacroStudio.Domain.Events;
 using MacroStudio.Domain.Interfaces;
@@ -62,10 +63,11 @@ public class ExecutionUsesCurrentlyEditedScriptTests
 
             var inputSimulator = new Mock<IInputSimulator>();
 
+            var arduinoConnectionService = new ArduinoConnectionService(new FakeArduinoService(), NullLogger<ArduinoConnectionService>.Instance);
             var scriptListVm = new ScriptListViewModel(scriptManager.Object, logging.Object);
             var commandGridVm = new CommandGridViewModel(scriptManager.Object, logging.Object, inputSimulator.Object);
-            var execVm = new ExecutionControlViewModel(exec, logging.Object, settings.Object);
-            var recordingVm = new RecordingViewModel(recordingService.Object, scriptManager.Object, logging.Object, scriptListVm, commandGridVm);
+            var execVm = new ExecutionControlViewModel(exec, logging.Object, settings.Object, arduinoConnectionService);
+            var recordingVm = new RecordingViewModel(recordingService.Object, scriptManager.Object, logging.Object, scriptListVm, commandGridVm, arduinoConnectionService);
             var loggingVm = new LoggingViewModel(logging.Object);
             var settingsVm = new SettingsViewModel(settings.Object, recordingHotkeyHook.Object, logging.Object, new LocalizationService());
 
@@ -162,6 +164,23 @@ public class ExecutionUsesCurrentlyEditedScriptTests
         public Task<ExecutionValidationResult> ValidateScriptForExecutionAsync(Script script) => Task.FromResult(ExecutionValidationResult.Success());
         public ExecutionStatistics? GetExecutionStatistics() => null;
         public TimeSpan? GetEstimatedRemainingTime() => null;
+    }
+
+
+    private sealed class FakeArduinoService : IArduinoService
+    {
+        public ArduinoConnectionState ConnectionState => ArduinoConnectionState.Disconnected;
+        public bool IsConnected => false;
+        public string? ConnectedPortName => null;
+
+        public event EventHandler<ArduinoConnectionStateChangedEventArgs>? ConnectionStateChanged;
+        public event EventHandler<ArduinoEventReceivedEventArgs>? EventReceived;
+        public event EventHandler<ArduinoErrorEventArgs>? ErrorOccurred;
+
+        public Task<IReadOnlyList<string>> GetAvailablePortsAsync() => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
+        public Task ConnectAsync(string portName) => Task.CompletedTask;
+        public Task DisconnectAsync() => Task.CompletedTask;
+        public Task SendCommandAsync(ArduinoCommand command) => Task.CompletedTask;
     }
 }
 
