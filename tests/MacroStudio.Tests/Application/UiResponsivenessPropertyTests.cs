@@ -130,9 +130,11 @@ public class UiResponsivenessPropertyTests
         public bool IsConnected => false;
         public string? ConnectedPortName => null;
 
+#pragma warning disable CS0067 // Events are required by IArduinoService but not used in this test double.
         public event EventHandler<ArduinoConnectionStateChangedEventArgs>? ConnectionStateChanged;
         public event EventHandler<ArduinoEventReceivedEventArgs>? EventReceived;
         public event EventHandler<ArduinoErrorEventArgs>? ErrorOccurred;
+#pragma warning restore CS0067
 
         public Task<IReadOnlyList<string>> GetAvailablePortsAsync() => Task.FromResult<IReadOnlyList<string>>(Array.Empty<string>());
         public Task ConnectAsync(string portName) => Task.CompletedTask;
