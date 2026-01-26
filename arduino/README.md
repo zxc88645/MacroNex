@@ -24,7 +24,34 @@ USB Host Shield 2.0 通過 SPI 接口連接到 Arduino Leonardo：
 
 **注意**：某些 USB Host Shield 版本可能使用不同的引腳配置，請參考您的 Shield 文檔。
 
-## 所需庫
+## 開發環境
+
+### 使用 PlatformIO（推薦）
+
+PlatformIO 是一個跨平台的嵌入式開發工具，提供更好的依賴管理和構建體驗。
+
+1. **安裝 PlatformIO**
+   - 下載並安裝 [PlatformIO IDE](https://platformio.org/install/ide?install=vscode)（VS Code 擴展）或 [PlatformIO Core](https://platformio.org/install/cli)
+
+2. **打開項目**
+   ```bash
+   cd arduino
+   pio run
+   ```
+
+3. **上傳固件**
+   ```bash
+   pio run --target upload
+   ```
+
+4. **監控串口**
+   ```bash
+   pio device monitor
+   ```
+
+項目已包含 `platformio.ini` 配置文件，會自動安裝所需的庫。
+
+### 使用 Arduino IDE
 
 在 Arduino IDE 中安裝以下庫：
 
