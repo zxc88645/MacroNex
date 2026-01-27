@@ -1,4 +1,4 @@
-﻿using MacroNex.Application.Services;
+using MacroNex.Application.Services;
 using MacroNex.Domain.Entities;
 using MacroNex.Domain.Events;
 using MacroNex.Domain.Interfaces;
@@ -80,6 +80,7 @@ public class ExecutionUsesCurrentlyEditedScriptTests
                 exec,
                 logging.Object,
                 safetyService.Object,
+                settings.Object,
                 recordingHotkeyHook.Object,
                 scriptHotkeyHook.Object,
                 scriptListVm,
