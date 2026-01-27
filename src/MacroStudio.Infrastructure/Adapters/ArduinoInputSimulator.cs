@@ -1,6 +1,9 @@
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
+using MacroStudio.Infrastructure.Win32;
 using Microsoft.Extensions.Logging;
+using static MacroStudio.Infrastructure.Win32.Win32Api;
+using static MacroStudio.Infrastructure.Win32.Win32Structures;
 
 namespace MacroStudio.Infrastructure.Adapters;
 
@@ -31,7 +34,25 @@ public sealed class ArduinoInputSimulator : IInputSimulator, IDisposable
 
         try
         {
-            var command = new ArduinoMouseMoveAbsoluteCommand(position.X, position.Y);
+            // Get current cursor position using Win32 API
+            var currentPosition = await GetCursorPositionInternalAsync();
+            
+            // Calculate relative movement
+            int deltaX = position.X - currentPosition.X;
+            int deltaY = position.Y - currentPosition.Y;
+            
+            _logger.LogTrace("Current position: {Current}, Target: {Target}, Delta: ({DeltaX}, {DeltaY})", 
+                currentPosition, position, deltaX, deltaY);
+            
+            // Skip if no movement needed
+            if (deltaX == 0 && deltaY == 0)
+            {
+                _logger.LogTrace("No movement needed, already at target position");
+                return;
+            }
+            
+            // Send relative move command to Arduino
+            var command = new ArduinoMouseMoveRelativeCommand(deltaX, deltaY);
             await _arduinoService.SendCommandAsync(command);
         }
         catch (Exception ex)
@@ -43,7 +64,7 @@ public sealed class ArduinoInputSimulator : IInputSimulator, IDisposable
 
     public async Task SimulateMouseMoveLowLevelAsync(Point position)
     {
-        // For Arduino, low-level and regular move are the same
+        // For Arduino, low-level and regular move are the same (both use relative movement now)
         await SimulateMouseMoveAsync(position);
     }
 
@@ -216,13 +237,30 @@ public sealed class ArduinoInputSimulator : IInputSimulator, IDisposable
         }
     }
 
-    public Task<Point> GetCursorPositionAsync()
+    public async Task<Point> GetCursorPositionAsync()
     {
         ThrowIfDisposed();
+        return await GetCursorPositionInternalAsync();
+    }
+    
+    /// <summary>
+    /// Gets the current cursor position using Win32 API.
+    /// </summary>
+    private Task<Point> GetCursorPositionInternalAsync()
+    {
+        return Task.Run(() =>
+        {
+            if (!GetCursorPos(out POINT point))
+            {
+                var error = GetLastError();
+                _logger.LogError("Failed to get cursor position. Win32 error: {Error}", error);
+                throw new InputSimulationException("Failed to get cursor position", (int)error);
+            }
 
-        // Arduino doesn't provide cursor position, so we need to track it ourselves
-        // For now, throw NotSupportedException
-        throw new NotSupportedException("Getting cursor position is not supported in hardware mode. Position must be tracked by the application.");
+            var position = new Point(point.X, point.Y);
+            _logger.LogTrace("Current cursor position: {Position}", position);
+            return position;
+        });
     }
 
     public Task<bool> IsReadyAsync()

@@ -41,11 +41,50 @@ public interface IInputHookService
 
 public sealed class InputHookMouseMoveEventArgs : EventArgs
 {
+    /// <summary>
+    /// The mouse position (absolute coordinates, or accumulated position for relative events).
+    /// </summary>
     public Point Position { get; }
+    
+    /// <summary>
+    /// Whether this is a relative movement event (from hardware input).
+    /// When true, DeltaX and DeltaY contain the original relative movement values.
+    /// </summary>
+    public bool IsRelative { get; }
+    
+    /// <summary>
+    /// The relative X displacement (only valid when IsRelative is true).
+    /// </summary>
+    public int DeltaX { get; }
+    
+    /// <summary>
+    /// The relative Y displacement (only valid when IsRelative is true).
+    /// </summary>
+    public int DeltaY { get; }
 
+    /// <summary>
+    /// Creates an absolute position mouse move event.
+    /// </summary>
     public InputHookMouseMoveEventArgs(Point position)
     {
         Position = position;
+        IsRelative = false;
+        DeltaX = 0;
+        DeltaY = 0;
+    }
+    
+    /// <summary>
+    /// Creates a relative movement mouse move event (from hardware input).
+    /// </summary>
+    /// <param name="deltaX">The relative X displacement.</param>
+    /// <param name="deltaY">The relative Y displacement.</param>
+    /// <param name="accumulatedPosition">The accumulated position for reference.</param>
+    public InputHookMouseMoveEventArgs(int deltaX, int deltaY, Point accumulatedPosition)
+    {
+        Position = accumulatedPosition;
+        IsRelative = true;
+        DeltaX = deltaX;
+        DeltaY = deltaY;
     }
 }
 

@@ -14,6 +14,9 @@ public sealed class ArduinoInputHookService : IInputHookService, IDisposable
     private RecordingOptions? _options;
     private bool _isInstalled;
     private bool _isDisposed;
+    
+    // Track accumulated mouse position (Arduino sends relative movements)
+    private Point _trackedMousePosition = Point.Zero;
 
     public ArduinoInputHookService(IArduinoService arduinoService, ILogger<ArduinoInputHookService> logger)
     {
@@ -56,6 +59,10 @@ public sealed class ArduinoInputHookService : IInputHookService, IDisposable
 
             _options = options;
             _isInstalled = true;
+            
+            // Reset tracked mouse position when starting recording
+            // Position will be accumulated from relative movements
+            _trackedMousePosition = Point.Zero;
         }
 
         _logger.LogInformation("Installed Arduino input hooks");
@@ -162,17 +169,25 @@ public sealed class ArduinoInputHookService : IInputHookService, IDisposable
         if (options == null || !options.RecordMouseMovements)
             return;
 
-        // Decode position: [X: 2 bytes][Y: 2 bytes]
-        int x = data[0] | (data[1] << 8);
-        int y = data[2] | (data[3] << 8);
+        // Decode relative movement: [ΔX: 2 bytes (int16)][ΔY: 2 bytes (int16)]
+        // Arduino sends relative movements from USB Host Shield - preserve original values!
+        short deltaX = (short)(data[0] | (data[1] << 8));
+        short deltaY = (short)(data[2] | (data[3] << 8));
 
-        var position = new Point(x, y);
-        MouseMoved?.Invoke(this, new InputHookMouseMoveEventArgs(position));
+        // Accumulate position for reference (used by mouse click events)
+        _trackedMousePosition = new Point(
+            _trackedMousePosition.X + deltaX,
+            _trackedMousePosition.Y + deltaY
+        );
+
+        // Send relative movement event with original ΔX, ΔY values (no conversion to absolute)
+        // This allows 100% accurate replay of hardware input
+        MouseMoved?.Invoke(this, new InputHookMouseMoveEventArgs(deltaX, deltaY, _trackedMousePosition));
     }
 
     private void HandleMouseClickEvent(byte[] data)
     {
-        if (data == null || data.Length < 6)
+        if (data == null || data.Length < 2)
         {
             _logger.LogWarning("Invalid mouse click event data: length {Length}", data?.Length ?? 0);
             return;
@@ -182,15 +197,14 @@ public sealed class ArduinoInputHookService : IInputHookService, IDisposable
         if (options == null || !options.RecordMouseClicks)
             return;
 
-        // Decode click: [X: 2 bytes][Y: 2 bytes][Button: 1 byte][ClickType: 1 byte]
-        int x = data[0] | (data[1] << 8);
-        int y = data[2] | (data[3] << 8);
-        var button = (MouseButton)data[4];
-        var clickType = (ClickType)data[5];
+        // Decode click: [Button: 1 byte][ClickType: 1 byte]
+        // Position tracking is done by application, not Arduino
+        var button = (MouseButton)data[0];
+        var clickType = (ClickType)data[1];
 
-        var position = new Point(x, y);
+        // Use tracked position from mouse move events
         // Arduino events are not injected (they come from real hardware)
-        MouseClicked?.Invoke(this, new InputHookMouseClickEventArgs(position, button, clickType, isInjected: false));
+        MouseClicked?.Invoke(this, new InputHookMouseClickEventArgs(_trackedMousePosition, button, clickType, isInjected: false));
     }
 
     private void HandleKeyboardInputEvent(byte[] data)
