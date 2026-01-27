@@ -36,6 +36,12 @@ public class AppSettings
     public HotkeyDefinition? RecordingPauseHotkey { get; set; }
     public HotkeyDefinition? RecordingStopHotkey { get; set; }
 
+    /// <summary>
+    /// 滑鼠校準數據（HID ΔXY 到像素的轉換）。
+    /// 用於 Arduino 硬體模式下的精確滑鼠控制。
+    /// </summary>
+    public MouseCalibrationData? MouseCalibration { get; set; }
+
     public static AppSettings Default()
     {
         var s = new AppSettings();
