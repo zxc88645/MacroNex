@@ -59,6 +59,55 @@ public sealed class ArduinoConnectionService : IDisposable
     public Task DisconnectAsync() => _arduinoService.DisconnectAsync();
 
     /// <summary>
+    /// Automatically detects and connects to an Arduino device.
+    /// Tries each available port until a successful connection is established.
+    /// </summary>
+    /// <returns>True if connection was successful, false otherwise.</returns>
+    public async Task<bool> AutoConnectAsync()
+    {
+        if (_arduinoService.IsConnected)
+        {
+            _logger.LogInformation("Arduino is already connected on port {PortName}", _arduinoService.ConnectedPortName);
+            return true;
+        }
+
+        var ports = await GetAvailablePortsAsync();
+        if (ports.Count == 0)
+        {
+            _logger.LogWarning("No serial ports available for Arduino connection");
+            return false;
+        }
+
+        _logger.LogInformation("Attempting to auto-connect to Arduino. Checking {PortCount} available ports", ports.Count);
+
+        foreach (var port in ports)
+        {
+            try
+            {
+                _logger.LogDebug("Attempting to connect to Arduino on port {PortName}", port);
+                await ConnectAsync(port);
+                
+                // Wait a moment to see if connection succeeds
+                await Task.Delay(500);
+                
+                if (_arduinoService.IsConnected)
+                {
+                    _logger.LogInformation("Successfully auto-connected to Arduino on port {PortName}", port);
+                    return true;
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogDebug(ex, "Failed to connect to Arduino on port {PortName}, trying next port", port);
+                // Continue to next port
+            }
+        }
+
+        _logger.LogWarning("Failed to auto-connect to Arduino on any available port");
+        return false;
+    }
+
+    /// <summary>
     /// Validates that the Arduino is ready for use in hardware mode.
     /// </summary>
     /// <returns>True if ready, false otherwise.</returns>

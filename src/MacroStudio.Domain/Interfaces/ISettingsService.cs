@@ -24,6 +24,11 @@ public class AppSettings
     public bool ShowCountdown { get; set; } = true;
     public double CountdownSeconds { get; set; } = 3.0;
 
+    /// <summary>
+    /// Global input mode for recording and execution (HighLevel, LowLevel, or Hardware).
+    /// </summary>
+    public InputMode GlobalInputMode { get; set; } = InputMode.HighLevel;
+
     public ExecutionLimits ExecutionLimits { get; set; } = ExecutionLimits.Default();
 
     // Recording control hotkeys (global). Defaults: F9 / F11 / F12.
@@ -54,6 +59,10 @@ public class AppSettings
 
         ExecutionLimits ??= ExecutionLimits.Default();
         if (CountdownSeconds <= 0) CountdownSeconds = 3.0;
+        
+        // Default to HighLevel if not set
+        if (!Enum.IsDefined(typeof(InputMode), GlobalInputMode))
+            GlobalInputMode = InputMode.HighLevel;
     }
 }
 

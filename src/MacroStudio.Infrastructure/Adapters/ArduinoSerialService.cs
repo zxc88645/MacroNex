@@ -31,8 +31,18 @@ public sealed class ArduinoSerialService : IArduinoService, IDisposable
 
     // Heartbeat configuration
     private const int HeartbeatIntervalMs = 5000; // 5 seconds
+    private const int HeartbeatTimeoutMs = 10000; // 10 seconds - timeout for heartbeat response
+    private const int MaxHeartbeatFailures = 3; // Maximum consecutive heartbeat failures before marking as error
     private CancellationTokenSource? _heartbeatCancellationTokenSource;
     private Task? _heartbeatTask;
+    private DateTime? _lastHeartbeatSent;
+    private DateTime? _lastHeartbeatReceived;
+    private int _consecutiveHeartbeatFailures = 0;
+    private readonly object _heartbeatLock = new();
+
+    // Handshake configuration
+    private const int HandshakeTimeoutMs = 5000; // 5 seconds - timeout for handshake response
+    private TaskCompletionSource<bool>? _handshakeCompletionSource;
 
     public ArduinoSerialService(ILogger<ArduinoSerialService> logger)
     {
@@ -150,12 +160,33 @@ public sealed class ArduinoSerialService : IArduinoService, IDisposable
             _readCancellationTokenSource = new CancellationTokenSource();
             _readTask = Task.Run(() => ReadLoopAsync(_readCancellationTokenSource.Token), _readCancellationTokenSource.Token);
 
+            // Perform handshake - wait for firmware to be ready
+            _logger.LogInformation("Performing handshake with Arduino on port {PortName}", portName);
+            var handshakeSuccess = await PerformHandshakeAsync();
+            
+            if (!handshakeSuccess)
+            {
+                _logger.LogWarning("Handshake failed or timed out with Arduino on port {PortName}", portName);
+                ConnectionState = ArduinoConnectionState.Error;
+                RaiseError("Handshake failed or timed out", null);
+                await DisconnectAsync();
+                throw new InvalidOperationException($"Handshake failed with Arduino on port {portName}. The firmware may not be responding.");
+            }
+
+            // Reset heartbeat tracking
+            lock (_heartbeatLock)
+            {
+                _lastHeartbeatSent = null;
+                _lastHeartbeatReceived = DateTime.UtcNow; // Assume handshake success means firmware is responsive
+                _consecutiveHeartbeatFailures = 0;
+            }
+
             // Start heartbeat task
             _heartbeatCancellationTokenSource = new CancellationTokenSource();
             _heartbeatTask = Task.Run(() => HeartbeatLoopAsync(_heartbeatCancellationTokenSource.Token), _heartbeatCancellationTokenSource.Token);
 
             ConnectionState = ArduinoConnectionState.Connected;
-            _logger.LogInformation("Connected to Arduino on port {PortName}", portName);
+            _logger.LogInformation("Connected to Arduino on port {PortName} after successful handshake", portName);
         }
         catch (Exception ex)
         {
@@ -236,6 +267,21 @@ public sealed class ArduinoSerialService : IArduinoService, IDisposable
         lock (_lockObject)
         {
             _receiveBuffer.Clear();
+        }
+
+        // Reset heartbeat tracking
+        lock (_heartbeatLock)
+        {
+            _lastHeartbeatSent = null;
+            _lastHeartbeatReceived = null;
+            _consecutiveHeartbeatFailures = 0;
+            
+            // Cancel any pending handshake
+            if (_handshakeCompletionSource != null && !_handshakeCompletionSource.Task.IsCompleted)
+            {
+                _handshakeCompletionSource.TrySetCanceled();
+                _handshakeCompletionSource = null;
+            }
         }
 
         ConnectionState = ArduinoConnectionState.Disconnected;
@@ -352,10 +398,19 @@ public sealed class ArduinoSerialService : IArduinoService, IDisposable
                 if (_receiveBuffer.Count == 0)
                     break;
 
-                if (ArduinoProtocolDecoder.TryDecodeEvent(_receiveBuffer.ToArray(), 0, out var decodedEvent) > 0)
+                // Try to decode event - only call once and reuse the result
+                var consumed = ArduinoProtocolDecoder.TryDecodeEvent(_receiveBuffer.ToArray(), 0, out var decodedEvent);
+                
+                if (consumed > 0)
                 {
                     if (decodedEvent != null)
                     {
+                        // Handle heartbeat response
+                        if (decodedEvent.EventType == ArduinoEventType.StatusResponse)
+                        {
+                            HandleHeartbeatResponse();
+                        }
+
                         var eventArgs = new ArduinoEventReceivedEventArgs(
                             decodedEvent.EventType,
                             decodedEvent.Data,
@@ -363,7 +418,6 @@ public sealed class ArduinoSerialService : IArduinoService, IDisposable
                         );
 
                         // Remove processed bytes
-                        var consumed = ArduinoProtocolDecoder.TryDecodeEvent(_receiveBuffer.ToArray(), 0, out _);
                         _receiveBuffer.RemoveRange(0, consumed);
 
                         // Raise event outside of lock
@@ -384,6 +438,85 @@ public sealed class ArduinoSerialService : IArduinoService, IDisposable
         }
     }
 
+    /// <summary>
+    /// Handles heartbeat response from Arduino.
+    /// </summary>
+    private void HandleHeartbeatResponse()
+    {
+        lock (_heartbeatLock)
+        {
+            _lastHeartbeatReceived = DateTime.UtcNow;
+            _consecutiveHeartbeatFailures = 0;
+
+            // Complete handshake if waiting
+            if (_handshakeCompletionSource != null && !_handshakeCompletionSource.Task.IsCompleted)
+            {
+                _handshakeCompletionSource.SetResult(true);
+            }
+        }
+    }
+
+    /// <summary>
+    /// Performs handshake with Arduino firmware by sending a status query and waiting for response.
+    /// </summary>
+    private async Task<bool> PerformHandshakeAsync()
+    {
+        _handshakeCompletionSource = new TaskCompletionSource<bool>();
+        
+        try
+        {
+            // Send initial status query to initiate handshake
+            var command = new ArduinoStatusQueryCommand();
+            
+            // We need to send the command directly since we're not fully connected yet
+            SerialPort? port;
+            lock (_lockObject)
+            {
+                port = _serialPort;
+            }
+
+            if (port == null || !port.IsOpen)
+            {
+                _logger.LogWarning("Serial port is not available for handshake");
+                return false;
+            }
+
+            var encoded = ArduinoProtocolEncoder.EncodeCommand(command);
+            await Task.Run(() =>
+            {
+                lock (port)
+                {
+                    port.Write(encoded, 0, encoded.Length);
+                }
+            });
+
+            _logger.LogDebug("Sent handshake command to Arduino");
+
+            // Wait for status response with timeout
+            var timeoutTask = Task.Delay(HandshakeTimeoutMs);
+            var completedTask = await Task.WhenAny(_handshakeCompletionSource.Task, timeoutTask);
+
+            if (completedTask == timeoutTask)
+            {
+                _logger.LogWarning("Handshake timeout - no response from Arduino");
+                return false;
+            }
+
+            var result = await _handshakeCompletionSource.Task;
+            _logger.LogDebug("Handshake completed with result: {Result}", result);
+            return result;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error during handshake");
+            return false;
+        }
+        finally
+        {
+            _handshakeCompletionSource = null;
+        }
+    }
+
     private async Task HeartbeatLoopAsync(CancellationToken cancellationToken)
     {
         while (!cancellationToken.IsCancellationRequested)
@@ -392,10 +525,61 @@ public sealed class ArduinoSerialService : IArduinoService, IDisposable
             {
                 await Task.Delay(HeartbeatIntervalMs, cancellationToken);
 
-                if (IsConnected)
+                if (!IsConnected)
+                    continue;
+
+                // Check if previous heartbeat timed out
+                lock (_heartbeatLock)
                 {
+                    if (_lastHeartbeatSent.HasValue && _lastHeartbeatReceived.HasValue)
+                    {
+                        var timeSinceLastResponse = DateTime.UtcNow - _lastHeartbeatReceived.Value;
+                        if (timeSinceLastResponse.TotalMilliseconds > HeartbeatTimeoutMs)
+                        {
+                            _consecutiveHeartbeatFailures++;
+                            _logger.LogWarning(
+                                "Heartbeat timeout - no response for {ElapsedMs}ms. Consecutive failures: {Failures}",
+                                timeSinceLastResponse.TotalMilliseconds,
+                                _consecutiveHeartbeatFailures);
+
+                            if (_consecutiveHeartbeatFailures >= MaxHeartbeatFailures)
+                            {
+                                _logger.LogError(
+                                    "Maximum heartbeat failures ({MaxFailures}) reached. Marking connection as error.",
+                                    MaxHeartbeatFailures);
+                                ConnectionState = ArduinoConnectionState.Error;
+                                RaiseError("Arduino firmware is not responding to heartbeat", null);
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                // Send heartbeat
+                try
+                {
+                    lock (_heartbeatLock)
+                    {
+                        _lastHeartbeatSent = DateTime.UtcNow;
+                    }
+
                     var command = new ArduinoStatusQueryCommand();
                     await SendCommandAsync(command);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to send heartbeat command");
+                    lock (_heartbeatLock)
+                    {
+                        _consecutiveHeartbeatFailures++;
+                        if (_consecutiveHeartbeatFailures >= MaxHeartbeatFailures)
+                        {
+                            _logger.LogError("Maximum heartbeat failures reached due to send errors");
+                            ConnectionState = ArduinoConnectionState.Error;
+                            RaiseError("Failed to send heartbeat to Arduino", ex);
+                            break;
+                        }
+                    }
                 }
             }
             catch (OperationCanceledException)
