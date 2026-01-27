@@ -831,6 +831,16 @@ public partial class DebugViewModel : ObservableObject
         CalibrationProgress = 100;
         StatusMessage = "校準完成！";
 
+        // Update manual ratio inputs with calibrated values
+        var avgRatioX = pointsX.Count > 0
+            ? pointsX.Where(p => p.HidDelta != 0).Average(p => p.ActualPixelDelta / p.HidDelta)
+            : 1.0;
+        var avgRatioY = pointsY.Count > 0
+            ? pointsY.Where(p => p.HidDelta != 0).Average(p => p.ActualPixelDelta / p.HidDelta)
+            : 1.0;
+        ManualRatioX = avgRatioX;
+        ManualRatioY = avgRatioY;
+
         await _loggingService.LogInfoAsync("Mouse calibration completed", new Dictionary<string, object>
         {
             { "PointsX", pointsX.Count },
