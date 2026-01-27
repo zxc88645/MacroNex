@@ -332,7 +332,6 @@ public class JsonFileStorageService : IFileStorageService
             Type = command switch
             {
                 MouseMoveCommand => "MouseMove",
-                MouseMoveLowLevelCommand => "MouseMoveLowLevel",
                 MouseClickCommand => "MouseClick",
                 KeyPressCommand => "KeyPress",
                 KeyboardCommand => "Keyboard",
@@ -349,13 +348,6 @@ public class JsonFileStorageService : IFileStorageService
                 {
                     ["x"] = moveCmd.Position.X,
                     ["y"] = moveCmd.Position.Y
-                };
-                break;
-            case MouseMoveLowLevelCommand moveLlCmd:
-                dto.Parameters = new Dictionary<string, object?>
-                {
-                    ["x"] = moveLlCmd.Position.X,
-                    ["y"] = moveLlCmd.Position.Y
                 };
                 break;
 
@@ -463,7 +455,8 @@ public class JsonFileStorageService : IFileStorageService
                     GetIntParameter(dto.Parameters, "y")
                 )
             ),
-            "MouseMoveLowLevel" => new MouseMoveLowLevelCommand(
+            // Legacy: convert old MouseMoveLowLevel to MouseMoveCommand for backward compatibility
+            "MouseMoveLowLevel" => new MouseMoveCommand(
                 dto.Id,
                 dto.Delay,
                 dto.CreatedAt,

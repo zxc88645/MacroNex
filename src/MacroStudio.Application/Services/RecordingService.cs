@@ -509,8 +509,7 @@ public class RecordingService : IRecordingService
         var stats = new RecordingStatistics
         {
             TotalCommands = commands.Count,
-            MouseMoveCommands = commands.Count(c => c is MouseMoveCommand || c is MouseMoveLowLevelCommand
-                || c is MouseMoveRelativeCommand || c is MouseMoveRelativeLowLevelCommand),
+            MouseMoveCommands = commands.Count(c => c is MouseMoveCommand || c is MouseMoveRelativeCommand),
             MouseClickCommands = commands.Count(c => c is MouseClickCommand),
             KeyboardCommands = commands.Count(c => c is KeyboardCommand),
             SleepCommands = commands.Count(c => c is SleepCommand),
@@ -581,24 +580,18 @@ public class RecordingService : IRecordingService
             }
 
             Command command;
-            // Use low-level commands when InputMode is LowLevel, high-level otherwise
-            var useLowLevel = session.Options.InputMode == InputMode.LowLevel;
-            
+            // Unified commands - actual execution mode depends on InputMode setting
             if (session.Options.UseRelativeMouseMove)
             {
                 // Calculate relative displacement
                 var deltaX = position.X - _lastMousePosition.X;
                 var deltaY = position.Y - _lastMousePosition.Y;
 
-                command = useLowLevel
-                    ? new MouseMoveRelativeLowLevelCommand(deltaX, deltaY)
-                    : new MouseMoveRelativeCommand(deltaX, deltaY);
+                command = new MouseMoveRelativeCommand(deltaX, deltaY);
             }
             else
             {
-                command = useLowLevel
-                    ? new MouseMoveLowLevelCommand(position)
-                    : new MouseMoveCommand(position);
+                command = new MouseMoveCommand(position);
             }
             command.Delay = delay;
 
@@ -672,9 +665,7 @@ public class RecordingService : IRecordingService
             // The command will be executed differently based on the playback mode:
             // - Hardware mode: send relative move directly to Arduino
             // - HighLevel/LowLevel mode: IInputSimulator converts to GetCursorPos + delta
-            Command command = session.Options.InputMode == InputMode.LowLevel
-                ? new MouseMoveRelativeLowLevelCommand(deltaX, deltaY)
-                : new MouseMoveRelativeCommand(deltaX, deltaY);
+            Command command = new MouseMoveRelativeCommand(deltaX, deltaY);
             
             command.Delay = delay;
 

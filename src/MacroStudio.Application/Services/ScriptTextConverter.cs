@@ -49,16 +49,9 @@ public static class ScriptTextConverter
             case MouseMoveCommand move:
                 sb.AppendLine($"move({move.Position.X}, {move.Position.Y})");
                 break;
-            case MouseMoveLowLevelCommand moveLl:
-                sb.AppendLine($"move({moveLl.Position.X}, {moveLl.Position.Y})");
-                break;
 
             case MouseMoveRelativeCommand moveRel:
                 sb.AppendLine($"move_rel({moveRel.DeltaX}, {moveRel.DeltaY})");
-                break;
-
-            case MouseMoveRelativeLowLevelCommand moveRelLl:
-                sb.AppendLine($"move_rel({moveRelLl.DeltaX}, {moveRelLl.DeltaY})");
                 break;
 
             case MouseClickCommand click:
@@ -165,22 +158,10 @@ public static class ScriptTextConverter
                     var ms = ParseSingleDoubleArg(codePart, "msleep");
                     commands.Add(new SleepCommand(TimeSpan.FromMilliseconds(ms)));
                 }
-                else if (codePart.StartsWith("move_rel_ll", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Legacy: treat move_rel_ll as move_rel (behavior depends on InputMode setting)
-                    var (dx, dy) = ParseTwoIntArgs(codePart, "move_rel_ll");
-                    commands.Add(new MouseMoveRelativeCommand(dx, dy));
-                }
                 else if (codePart.StartsWith("move_rel", StringComparison.OrdinalIgnoreCase))
                 {
                     var (dx, dy) = ParseTwoIntArgs(codePart, "move_rel");
                     commands.Add(new MouseMoveRelativeCommand(dx, dy));
-                }
-                else if (codePart.StartsWith("move_ll", StringComparison.OrdinalIgnoreCase))
-                {
-                    // Legacy: treat move_ll as move (behavior depends on InputMode setting)
-                    var (x, y) = ParseTwoIntArgs(codePart, "move_ll");
-                    commands.Add(new MouseMoveCommand(new Point(x, y)));
                 }
                 else if (codePart.StartsWith("move", StringComparison.OrdinalIgnoreCase))
                 {
@@ -260,8 +241,8 @@ public static class ScriptTextConverter
             throw new FormatException($"Invalid integer arguments for {name}(x, y).");
         }
 
-        // Only validate non-negative for absolute positions (move, move_ll)
-        // Relative movements (move_rel, move_rel_ll) can have negative values
+        // Only validate non-negative for absolute positions (move)
+        // Relative movements (move_rel) can have negative values
         if (!name.Contains("rel", StringComparison.OrdinalIgnoreCase))
         {
             if (x < 0 || y < 0)
