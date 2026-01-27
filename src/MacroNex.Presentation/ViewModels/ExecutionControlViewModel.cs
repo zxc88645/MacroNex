@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MacroNex.Domain.Entities;
 using MacroNex.Domain.Events;
@@ -186,7 +186,8 @@ public partial class ExecutionControlViewModel : ObservableObject
             { "ScriptId", Script.Id },
             { "ScriptName", Script.Name },
             { "ShowCountdown", ShowCountdown },
-            { "CountdownSeconds", CountdownDuration.TotalSeconds }
+            { "CountdownSeconds", CountdownDuration.TotalSeconds },
+            { "InputMode", globalInputMode.ToString() }
         });
 
         try

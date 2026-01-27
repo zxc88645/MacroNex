@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MacroNex.Application.Services;
 using MacroNex.Domain.Entities;
@@ -18,6 +18,7 @@ public partial class MainViewModel : ObservableObject
     private readonly IExecutionService _executionService;
     private readonly ILoggingService _loggingService;
     private readonly ISafetyService _safetyService;
+    private readonly ISettingsService _settingsService;
     private readonly IRecordingHotkeyHookService _recordingHotkeyHookService;
     private readonly IScriptHotkeyHookService _scriptHotkeyHookService;
 
@@ -46,6 +47,7 @@ public partial class MainViewModel : ObservableObject
         IExecutionService executionService,
         ILoggingService loggingService,
         ISafetyService safetyService,
+        ISettingsService settingsService,
         IRecordingHotkeyHookService recordingHotkeyHookService,
         IScriptHotkeyHookService scriptHotkeyHookService,
         ScriptListViewModel scriptListViewModel,
@@ -61,6 +63,7 @@ public partial class MainViewModel : ObservableObject
         _executionService = executionService ?? throw new ArgumentNullException(nameof(executionService));
         _loggingService = loggingService ?? throw new ArgumentNullException(nameof(loggingService));
         _safetyService = safetyService ?? throw new ArgumentNullException(nameof(safetyService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _recordingHotkeyHookService = recordingHotkeyHookService ?? throw new ArgumentNullException(nameof(recordingHotkeyHookService));
         _scriptHotkeyHookService = scriptHotkeyHookService ?? throw new ArgumentNullException(nameof(scriptHotkeyHookService));
 
@@ -118,12 +121,17 @@ public partial class MainViewModel : ObservableObject
 
                 if (script != null && script.TriggerHotkey != null)
                 {
+                    // Get global input mode from settings (same as execution button)
+                    var settings = await _settingsService.LoadAsync();
+                    var globalInputMode = settings.GlobalInputMode;
+
                     // Prepare execution options
                     var options = ExecutionOptions.Default();
                     options.TriggerSource = ExecutionTriggerSource.Hotkey;
                     options.ControlMode = ExecutionControlMode.RunOnly;
                     options.ShowCountdown = false;
                     options.CountdownDuration = TimeSpan.Zero;
+                    options.InputMode = globalInputMode;
 
                     // For "RepeatWhileHeld" mode, check if script is already executing
                     // If it is, ignore the trigger to avoid concurrent executions
@@ -160,7 +168,8 @@ public partial class MainViewModel : ObservableObject
                                 { "ScriptId", script.Id },
                                 { "ScriptName", script.Name },
                                 { "Hotkey", e.Hotkey.GetDisplayString() },
-                                { "TriggerMode", script.TriggerHotkey.TriggerMode.ToString() }
+                                { "TriggerMode", script.TriggerHotkey.TriggerMode.ToString() },
+                                { "InputMode", globalInputMode.ToString() }
                             });
                         }
                         catch { /* Ignore logging errors */ }
