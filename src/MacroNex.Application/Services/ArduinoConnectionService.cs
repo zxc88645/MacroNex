@@ -59,6 +59,13 @@ public sealed class ArduinoConnectionService : IDisposable
     public Task DisconnectAsync() => _arduinoService.DisconnectAsync();
 
     /// <summary>
+    /// Sends a command to the Arduino.
+    /// </summary>
+    /// <param name="command">The command to send.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
+    public Task SendCommandAsync(ArduinoCommand command) => _arduinoService.SendCommandAsync(command);
+
+    /// <summary>
     /// Automatically detects and connects to an Arduino device.
     /// Tries each available port until a successful connection is established.
     /// </summary>

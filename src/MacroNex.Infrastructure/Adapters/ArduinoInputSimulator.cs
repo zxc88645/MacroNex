@@ -9,16 +9,27 @@ namespace MacroNex.Infrastructure.Adapters;
 
 /// <summary>
 /// Arduino-based implementation of IInputSimulator that sends commands to Arduino Leonardo.
+/// Uses calibration data (if available) to convert pixel deltas to HID deltas for accurate movement.
 /// </summary>
 public sealed class ArduinoInputSimulator : IInputSimulator, IDisposable
 {
     private readonly IArduinoService _arduinoService;
+    private readonly ISettingsService _settingsService;
     private readonly ILogger<ArduinoInputSimulator> _logger;
     private bool _isDisposed;
+    
+    // Cached calibration data to avoid loading settings on every move
+    private MouseCalibrationData? _calibrationData;
+    private DateTime _calibrationLoadedAt;
+    private static readonly TimeSpan CalibrationCacheExpiry = TimeSpan.FromMinutes(5);
 
-    public ArduinoInputSimulator(IArduinoService arduinoService, ILogger<ArduinoInputSimulator> logger)
+    public ArduinoInputSimulator(
+        IArduinoService arduinoService, 
+        ISettingsService settingsService,
+        ILogger<ArduinoInputSimulator> logger)
     {
         _arduinoService = arduinoService ?? throw new ArgumentNullException(nameof(arduinoService));
+        _settingsService = settingsService ?? throw new ArgumentNullException(nameof(settingsService));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
@@ -37,22 +48,29 @@ public sealed class ArduinoInputSimulator : IInputSimulator, IDisposable
             // Get current cursor position using Win32 API
             var currentPosition = await GetCursorPositionInternalAsync();
             
-            // Calculate relative movement
-            int deltaX = position.X - currentPosition.X;
-            int deltaY = position.Y - currentPosition.Y;
+            // Calculate target pixel movement
+            int targetDeltaX = position.X - currentPosition.X;
+            int targetDeltaY = position.Y - currentPosition.Y;
             
-            _logger.LogTrace("Current position: {Current}, Target: {Target}, Delta: ({DeltaX}, {DeltaY})", 
-                currentPosition, position, deltaX, deltaY);
+            _logger.LogTrace("Current position: {Current}, Target: {Target}, PixelDelta: ({DeltaX}, {DeltaY})", 
+                currentPosition, position, targetDeltaX, targetDeltaY);
             
             // Skip if no movement needed
-            if (deltaX == 0 && deltaY == 0)
+            if (targetDeltaX == 0 && targetDeltaY == 0)
             {
                 _logger.LogTrace("No movement needed, already at target position");
                 return;
             }
             
+            // Load calibration data and calculate HID deltas
+            await RefreshCalibrationDataAsync();
+            int hidDeltaX = CalculateHidDelta(targetDeltaX, useYAxis: false);
+            int hidDeltaY = CalculateHidDelta(targetDeltaY, useYAxis: true);
+            
+            _logger.LogTrace("Calibrated HID Delta: ({HidDeltaX}, {HidDeltaY})", hidDeltaX, hidDeltaY);
+            
             // Send relative move command to Arduino
-            var command = new ArduinoMouseMoveRelativeCommand(deltaX, deltaY);
+            var command = new ArduinoMouseMoveRelativeCommand(hidDeltaX, hidDeltaY);
             await _arduinoService.SendCommandAsync(command);
         }
         catch (Exception ex)
@@ -76,11 +94,18 @@ public sealed class ArduinoInputSimulator : IInputSimulator, IDisposable
         if (!_arduinoService.IsConnected)
             throw new InvalidOperationException("Arduino is not connected.");
 
-        _logger.LogDebug("Simulating relative mouse move ({DeltaX}, {DeltaY}) via Arduino", deltaX, deltaY);
+        _logger.LogDebug("Simulating relative mouse move (Pixel: {DeltaX}, {DeltaY}) via Arduino", deltaX, deltaY);
 
         try
         {
-            var command = new ArduinoMouseMoveRelativeCommand(deltaX, deltaY);
+            // Load calibration data and calculate HID deltas
+            await RefreshCalibrationDataAsync();
+            int hidDeltaX = CalculateHidDelta(deltaX, useYAxis: false);
+            int hidDeltaY = CalculateHidDelta(deltaY, useYAxis: true);
+            
+            _logger.LogTrace("Calibrated HID Delta: ({HidDeltaX}, {HidDeltaY})", hidDeltaX, hidDeltaY);
+            
+            var command = new ArduinoMouseMoveRelativeCommand(hidDeltaX, hidDeltaY);
             await _arduinoService.SendCommandAsync(command);
         }
         catch (Exception ex)
@@ -304,6 +329,71 @@ public sealed class ArduinoInputSimulator : IInputSimulator, IDisposable
         if (_isDisposed)
             throw new ObjectDisposedException(nameof(ArduinoInputSimulator));
     }
+
+    #region Calibration Data Management
+
+    /// <summary>
+    /// Refreshes the calibration data from settings if it's stale or not loaded.
+    /// </summary>
+    private async Task RefreshCalibrationDataAsync()
+    {
+        // Check if we need to refresh the cached calibration data
+        if (_calibrationData != null && DateTime.Now - _calibrationLoadedAt < CalibrationCacheExpiry)
+        {
+            return; // Use cached data
+        }
+
+        try
+        {
+            var settings = await _settingsService.LoadAsync();
+            _calibrationData = settings.MouseCalibration;
+            _calibrationLoadedAt = DateTime.Now;
+
+            if (_calibrationData != null && _calibrationData.IsValid)
+            {
+                _logger.LogDebug("Loaded mouse calibration data: {Summary}", _calibrationData.GetSummary());
+            }
+            else
+            {
+                _logger.LogTrace("No valid mouse calibration data available, using 1:1 mapping");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to load calibration data, using 1:1 mapping");
+            _calibrationData = null;
+        }
+    }
+
+    /// <summary>
+    /// Calculates the HID delta needed to achieve the target pixel movement.
+    /// Uses calibration data if available, otherwise assumes 1:1 mapping.
+    /// </summary>
+    /// <param name="targetPixelDelta">The target pixel movement</param>
+    /// <param name="useYAxis">Whether to use Y-axis calibration data</param>
+    /// <returns>The HID delta to send to Arduino</returns>
+    private int CalculateHidDelta(int targetPixelDelta, bool useYAxis)
+    {
+        if (_calibrationData == null || !_calibrationData.IsValid)
+        {
+            // No calibration data, assume 1:1 mapping
+            return targetPixelDelta;
+        }
+
+        return _calibrationData.CalculateHidDelta(targetPixelDelta, useYAxis);
+    }
+
+    /// <summary>
+    /// Forces a refresh of the calibration data on next mouse move.
+    /// Call this after calibration is completed.
+    /// </summary>
+    public void InvalidateCalibrationCache()
+    {
+        _calibrationData = null;
+        _logger.LogDebug("Calibration cache invalidated");
+    }
+
+    #endregion
 
     public void Dispose()
     {
