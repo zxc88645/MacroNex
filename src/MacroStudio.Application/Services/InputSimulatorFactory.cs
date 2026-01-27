@@ -36,7 +36,8 @@ public sealed class InputSimulatorFactory : IInputSimulatorFactory
     {
         return mode switch
         {
-            InputMode.Software => _softwareInputSimulator,
+            InputMode.HighLevel => _softwareInputSimulator,
+            InputMode.LowLevel => _softwareInputSimulator, // Same Win32 simulator, but will use low-level methods
             InputMode.Hardware => _hardwareInputSimulator,
             _ => throw new ArgumentException($"Unknown input mode: {mode}", nameof(mode))
         };

@@ -36,7 +36,8 @@ public sealed class InputHookServiceFactory : IInputHookServiceFactory
     {
         return mode switch
         {
-            InputMode.Software => _softwareInputHookService,
+            InputMode.HighLevel => _softwareInputHookService,
+            InputMode.LowLevel => _softwareInputHookService, // Same Win32 hook service for both high and low level
             InputMode.Hardware => _hardwareInputHookService,
             _ => throw new ArgumentException($"Unknown input mode: {mode}", nameof(mode))
         };

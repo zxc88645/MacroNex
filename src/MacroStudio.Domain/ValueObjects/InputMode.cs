@@ -6,9 +6,14 @@ namespace MacroStudio.Domain.ValueObjects;
 public enum InputMode
 {
     /// <summary>
-    /// Software mode: uses Win32 API for input simulation and hooks.
+    /// High-level mode: uses Win32 API high-level methods (SetCursorPos) for input simulation.
     /// </summary>
-    Software,
+    HighLevel,
+
+    /// <summary>
+    /// Low-level mode: uses Win32 API low-level methods (SendInput) for input simulation.
+    /// </summary>
+    LowLevel,
 
     /// <summary>
     /// Hardware mode: uses Arduino Leonardo + USB Host Shield for hardware-level input.

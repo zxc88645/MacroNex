@@ -292,7 +292,7 @@ public class ExecutionOptions
     /// <summary>
     /// The input mode to use for execution (Software or Hardware).
     /// </summary>
-    public InputMode InputMode { get; set; } = InputMode.Software;
+    public InputMode InputMode { get; set; } = InputMode.HighLevel;
 
     /// <summary>
     /// Creates default execution options.
