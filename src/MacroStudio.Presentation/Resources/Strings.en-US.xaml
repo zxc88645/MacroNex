@@ -72,6 +72,12 @@
   <sys:String x:Key="Ui.Button.Export">Export</sys:String>
   <sys:String x:Key="Ui.Scripts.SetHotkey">Set hotkey</sys:String>
 
+  <!-- Script context menu -->
+  <sys:String x:Key="Ui.Scripts.ContextMenu.Rename">Rename Script</sys:String>
+  <sys:String x:Key="Ui.Scripts.ContextMenu.SetHotkey">Set Hotkey</sys:String>
+  <sys:String x:Key="Ui.Scripts.ContextMenu.Export">Export Script</sys:String>
+  <sys:String x:Key="Ui.Scripts.ContextMenu.Delete">Delete Script</sys:String>
+
   <!-- Script editor -->
   <sys:String x:Key="Ui.Editor.Title">Script Editor</sys:String>
   <sys:String x:Key="Ui.Editor.AddSleep">Add Sleep</sys:String>
@@ -135,5 +141,10 @@
   <sys:String x:Key="Ui.Dialog.SaveRecording.Subtitle">Save the recorded commands as a new script.</sys:String>
   <sys:String x:Key="Ui.Dialog.SaveRecording.Label">Script name:</sys:String>
   <sys:String x:Key="Ui.Dialog.SaveRecording.DefaultName">Recorded Script</sys:String>
+
+  <!-- Rename dialog -->
+  <sys:String x:Key="Ui.Dialog.RenameScript.Title">Rename Script</sys:String>
+  <sys:String x:Key="Ui.Dialog.RenameScript.Subtitle">Enter a new name for the script.</sys:String>
+  <sys:String x:Key="Ui.Dialog.RenameScript.Label">Script name:</sys:String>
 </ResourceDictionary>
 

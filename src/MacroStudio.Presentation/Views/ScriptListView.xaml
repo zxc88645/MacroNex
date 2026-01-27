@@ -34,6 +34,39 @@
             <ListBox ItemsSource="{Binding ScriptList.Scripts}"
                      SelectedItem="{Binding ScriptList.SelectedScript, Mode=TwoWay}"
                      BorderThickness="0">
+                <ListBox.Resources>
+                    <Style TargetType="{x:Type ContextMenu}">
+                        <Setter Property="Background" Value="{StaticResource Surface}"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                        <Setter Property="BorderBrush" Value="{StaticResource ScrollThumbBrush}"/>
+                        <Setter Property="BorderThickness" Value="1"/>
+                    </Style>
+                    <Style TargetType="{x:Type MenuItem}">
+                        <Setter Property="Background" Value="{StaticResource Surface}"/>
+                        <Setter Property="Foreground" Value="{StaticResource TextBrush}"/>
+                        <Setter Property="Padding" Value="10,4"/>
+                        <Setter Property="BorderThickness" Value="0"/>
+                        <Style.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="{StaticResource Bg1}"/>
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </ListBox.Resources>
+                <ListBox.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="{DynamicResource Ui.Scripts.ContextMenu.Rename}" 
+                                  Command="{Binding ScriptList.RenameSelectedCommand}" />
+                        <Separator/>
+                        <MenuItem Header="{DynamicResource Ui.Scripts.ContextMenu.SetHotkey}" 
+                                  Command="{Binding ScriptList.SetHotkeyCommand}" />
+                        <MenuItem Header="{DynamicResource Ui.Scripts.ContextMenu.Export}" 
+                                  Command="{Binding ScriptList.ExportSelectedCommand}" />
+                        <Separator/>
+                        <MenuItem Header="{DynamicResource Ui.Scripts.ContextMenu.Delete}" 
+                                  Command="{Binding ScriptList.DeleteSelectedCommand}" />
+                    </ContextMenu>
+                </ListBox.ContextMenu>
                 <ListBox.ItemTemplate>
                     <DataTemplate>
                         <StackPanel Orientation="Horizontal">

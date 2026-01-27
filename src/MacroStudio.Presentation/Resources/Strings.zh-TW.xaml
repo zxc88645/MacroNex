@@ -72,6 +72,12 @@
   <sys:String x:Key="Ui.Button.Export">匯出</sys:String>
   <sys:String x:Key="Ui.Scripts.SetHotkey">設置熱鍵</sys:String>
 
+  <!-- Script context menu -->
+  <sys:String x:Key="Ui.Scripts.ContextMenu.Rename">變更腳本名稱</sys:String>
+  <sys:String x:Key="Ui.Scripts.ContextMenu.SetHotkey">設定熱鍵</sys:String>
+  <sys:String x:Key="Ui.Scripts.ContextMenu.Export">匯出腳本</sys:String>
+  <sys:String x:Key="Ui.Scripts.ContextMenu.Delete">刪除腳本</sys:String>
+
   <!-- Script editor -->
   <sys:String x:Key="Ui.Editor.Title">腳本編輯器</sys:String>
   <sys:String x:Key="Ui.Editor.AddSleep">新增延遲</sys:String>
@@ -135,5 +141,10 @@
   <sys:String x:Key="Ui.Dialog.SaveRecording.Subtitle">將目前錄製的命令另存為新的腳本。</sys:String>
   <sys:String x:Key="Ui.Dialog.SaveRecording.Label">腳本名稱：</sys:String>
   <sys:String x:Key="Ui.Dialog.SaveRecording.DefaultName">錄製的腳本</sys:String>
+
+  <!-- Rename dialog -->
+  <sys:String x:Key="Ui.Dialog.RenameScript.Title">變更腳本名稱</sys:String>
+  <sys:String x:Key="Ui.Dialog.RenameScript.Subtitle">請輸入新的腳本名稱。</sys:String>
+  <sys:String x:Key="Ui.Dialog.RenameScript.Label">腳本名稱：</sys:String>
 </ResourceDictionary>
 

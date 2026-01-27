@@ -3,6 +3,7 @@ using CommunityToolkit.Mvvm.Input;
 using MacroStudio.Domain.Entities;
 using MacroStudio.Domain.Interfaces;
 using MacroStudio.Domain.ValueObjects;
+using MacroStudio.Presentation.Utilities;
 using MacroStudio.Presentation.ViewModels;
 using MacroStudio.Presentation.Views;
 using Microsoft.Win32;
@@ -185,11 +186,55 @@ public partial class ScriptListViewModel : ObservableObject
 
     private bool CanSetHotkey() => SelectedScript != null;
 
+    [RelayCommand(CanExecute = nameof(CanRenameSelected))]
+    private async Task RenameSelectedAsync()
+    {
+        if (SelectedScript == null) return;
+
+        var mainWindow = System.Windows.Application.Current?.MainWindow;
+        var dlg = new InputDialog(
+            UiText.Get("Ui.Dialog.RenameScript.Title", "Rename Script"),
+            UiText.Get("Ui.Dialog.RenameScript.Subtitle", "Enter a new name for the script."),
+            UiText.Get("Ui.Dialog.RenameScript.Label", "Script name:"),
+            SelectedScript.Name)
+        {
+            Owner = mainWindow
+        };
+
+        if (dlg.ShowDialog() != true || string.IsNullOrWhiteSpace(dlg.ValueText))
+            return;
+
+        var newName = dlg.ValueText.Trim();
+        if (newName == SelectedScript.Name)
+            return;
+
+        try
+        {
+            var scriptId = SelectedScript.Id;
+            await _scriptManager.RenameScriptAsync(scriptId, newName);
+            await RefreshAsync();
+            SelectedScript = Scripts.FirstOrDefault(s => s.Id == scriptId);
+            await _loggingService.LogInfoAsync("Script renamed", new Dictionary<string, object>
+            {
+                { "ScriptId", scriptId },
+                { "NewName", newName }
+            });
+        }
+        catch (InvalidOperationException ex)
+        {
+            System.Windows.MessageBox.Show(ex.Message, "Rename Failed",
+                System.Windows.MessageBoxButton.OK, System.Windows.MessageBoxImage.Warning);
+        }
+    }
+
+    private bool CanRenameSelected() => SelectedScript != null;
+
     partial void OnSelectedScriptChanged(Script? oldValue, Script? newValue)
     {
         DeleteSelectedCommand.NotifyCanExecuteChanged();
         ExportSelectedCommand.NotifyCanExecuteChanged();
         SetHotkeyCommand.NotifyCanExecuteChanged();
+        RenameSelectedCommand.NotifyCanExecuteChanged();
         SelectedScriptChanged?.Invoke(this, newValue);
     }
 }
