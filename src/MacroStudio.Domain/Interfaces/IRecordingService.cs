@@ -177,11 +177,6 @@ public class RecordingOptions
     public bool RecordMouseMovements { get; set; } = true;
 
     /// <summary>
-    /// When recording mouse movements, choose whether to emit a lower-level move command (move_ll) instead of move.
-    /// </summary>
-    public bool UseLowLevelMouseMove { get; set; } = true;
-
-    /// <summary>
     /// Whether to record mouse movements as relative displacements instead of absolute positions.
     /// </summary>
     public bool UseRelativeMouseMove { get; set; } = false;
@@ -224,7 +219,7 @@ public class RecordingOptions
     /// <summary>
     /// The input mode to use for recording (Software or Hardware).
     /// </summary>
-    public InputMode InputMode { get; set; } = InputMode.Software;
+    public InputMode InputMode { get; set; } = InputMode.HighLevel;
 
     /// <summary>
     /// Creates default recording options.

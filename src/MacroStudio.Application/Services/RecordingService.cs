@@ -262,7 +262,15 @@ public class RecordingService : IRecordingService
 
     private void OnMouseMoved(object? sender, InputHookMouseMoveEventArgs e)
     {
-        HandleMouseMove(e.Position);
+        if (e.IsRelative)
+        {
+            // Hardware input: use original relative values for 100% accurate replay
+            HandleMouseMoveRelative(e.DeltaX, e.DeltaY, e.Position);
+        }
+        else
+        {
+            HandleMouseMove(e.Position);
+        }
     }
 
     private void OnMouseClicked(object? sender, InputHookMouseClickEventArgs e)
@@ -573,19 +581,22 @@ public class RecordingService : IRecordingService
             }
 
             Command command;
+            // Use low-level commands when InputMode is LowLevel, high-level otherwise
+            var useLowLevel = session.Options.InputMode == InputMode.LowLevel;
+            
             if (session.Options.UseRelativeMouseMove)
             {
                 // Calculate relative displacement
                 var deltaX = position.X - _lastMousePosition.X;
                 var deltaY = position.Y - _lastMousePosition.Y;
 
-                command = session.Options.UseLowLevelMouseMove
+                command = useLowLevel
                     ? new MouseMoveRelativeLowLevelCommand(deltaX, deltaY)
                     : new MouseMoveRelativeCommand(deltaX, deltaY);
             }
             else
             {
-                command = session.Options.UseLowLevelMouseMove
+                command = useLowLevel
                     ? new MouseMoveLowLevelCommand(position)
                     : new MouseMoveCommand(position);
             }
@@ -602,6 +613,82 @@ public class RecordingService : IRecordingService
         {
             _logger.LogError(ex, "Error handling mouse move event");
             RaiseError(ex, "Handling mouse move", session.Id);
+        }
+    }
+
+    /// <summary>
+    /// Handles a relative mouse move event (from hardware input via USB Host Shield).
+    /// Preserves the original ΔX, ΔY values for 100% accurate replay.
+    /// </summary>
+    /// <param name="deltaX">The relative X displacement.</param>
+    /// <param name="deltaY">The relative Y displacement.</param>
+    /// <param name="accumulatedPosition">The accumulated position for reference.</param>
+    internal void HandleMouseMoveRelative(int deltaX, int deltaY, Point accumulatedPosition)
+    {
+        RecordingSession? session;
+
+        lock (_stateLock)
+        {
+            session = _currentSession;
+            if (session == null || session.State != RecordingState.Active)
+            {
+                return;
+            }
+
+            if (!session.Options.RecordMouseMovements)
+            {
+                return;
+            }
+        }
+
+        try
+        {
+            var now = DateTime.UtcNow;
+            var delay = now - _lastEventTime;
+
+            // Apply minimum delay filter
+            if (_isFirstEventInSegment)
+                delay = TimeSpan.Zero;
+
+            if (!_isFirstEventInSegment && delay < session.Options.MinimumDelay)
+            {
+                return; // Skip this event
+            }
+
+            // Apply maximum delay cap
+            if (delay > session.Options.MaximumDelay)
+            {
+                delay = session.Options.MaximumDelay;
+            }
+
+            // Skip zero movement
+            if (deltaX == 0 && deltaY == 0)
+            {
+                return;
+            }
+
+            // For hardware input, always create relative move command
+            // This preserves the exact USB Host Shield data for 100% accurate replay
+            // The command will be executed differently based on the playback mode:
+            // - Hardware mode: send relative move directly to Arduino
+            // - HighLevel/LowLevel mode: IInputSimulator converts to GetCursorPos + delta
+            Command command = session.Options.InputMode == InputMode.LowLevel
+                ? new MouseMoveRelativeLowLevelCommand(deltaX, deltaY)
+                : new MouseMoveRelativeCommand(deltaX, deltaY);
+            
+            command.Delay = delay;
+
+            session.AddCommand(command);
+            _lastEventTime = now;
+            _lastMousePosition = accumulatedPosition;
+            _isFirstEventInSegment = false;
+
+            RaiseCommandRecorded(command, session.Id);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Error handling relative mouse move event");
+            RaiseError(ex, "Handling relative mouse move", session.Id);
         }
     }
 
