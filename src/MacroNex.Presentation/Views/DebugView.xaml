@@ -117,9 +117,9 @@
                                              Margin="0,0,0,8"
                                              Visibility="{Binding IsCalibrating, Converter={StaticResource BoolToVisibility}}"/>
 
-                                <!-- Buttons -->
+                                <!-- Auto Calibration Buttons -->
                                 <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
-                                    <Button Content="開始校準" 
+                                    <Button Content="自動校準" 
                                             Width="80"
                                             Margin="0,0,8,0"
                                             Style="{DynamicResource PrimaryButton}"
@@ -132,6 +132,42 @@
                                             Width="80"
                                             Command="{Binding ClearCalibrationCommand}"/>
                                 </StackPanel>
+
+                                <!-- Manual Calibration Input -->
+                                <Border Background="{DynamicResource Bg1}" 
+                                        CornerRadius="3" 
+                                        Padding="10" 
+                                        Margin="0,0,0,10"
+                                        BorderBrush="{DynamicResource BorderBrushSoft}" 
+                                        BorderThickness="1">
+                                    <StackPanel>
+                                        <TextBlock Text="手動設定比例" FontWeight="SemiBold" Margin="0,0,0,8"/>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="X 軸:" VerticalAlignment="Center" Margin="0,0,6,0" Grid.Column="0"/>
+                                            <TextBox Text="{Binding ManualRatioX, UpdateSourceTrigger=PropertyChanged, StringFormat=F3}" 
+                                                     Width="70" Grid.Column="1" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Y 軸:" VerticalAlignment="Center" Margin="12,0,6,0" Grid.Column="2"/>
+                                            <TextBox Text="{Binding ManualRatioY, UpdateSourceTrigger=PropertyChanged, StringFormat=F3}" 
+                                                     Width="70" Grid.Column="3" VerticalAlignment="Center"/>
+                                            <Button Content="保存" 
+                                                    Width="60" 
+                                                    Margin="12,0,0,0"
+                                                    Grid.Column="4"
+                                                    Command="{Binding SaveManualCalibrationCommand}"/>
+                                        </Grid>
+                                        <TextBlock Text="(Pixel = HID × 比例)" 
+                                                   Foreground="{DynamicResource TextMutedBrush}" 
+                                                   FontSize="11" 
+                                                   Margin="0,6,0,0"/>
+                                    </StackPanel>
+                                </Border>
 
                                 <!-- Calibration Formula -->
                                 <Border Background="{DynamicResource Bg1}" 

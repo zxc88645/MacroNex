@@ -80,6 +80,13 @@ public partial class DebugViewModel : ObservableObject
     [ObservableProperty]
     private string calibrationFormula = "";
 
+    // Manual calibration input properties
+    [ObservableProperty]
+    private double manualRatioX = 1.0;
+
+    [ObservableProperty]
+    private double manualRatioY = 1.0;
+
     private CancellationTokenSource? _calibrationCts;
 
     public DebugViewModel(
@@ -453,6 +460,16 @@ public partial class DebugViewModel : ObservableObject
                 CalibrationStatus = settings.MouseCalibration.GetSummary();
                 CalibrationFormula = GenerateFormulaDisplay(settings.MouseCalibration);
                 
+                // Calculate average ratios for manual input fields
+                var avgRatioX = settings.MouseCalibration.PointsX.Count > 0
+                    ? settings.MouseCalibration.PointsX.Where(p => p.HidDelta != 0).Average(p => p.ActualPixelDelta / p.HidDelta)
+                    : 1.0;
+                var avgRatioY = settings.MouseCalibration.PointsY.Count > 0
+                    ? settings.MouseCalibration.PointsY.Where(p => p.HidDelta != 0).Average(p => p.ActualPixelDelta / p.HidDelta)
+                    : 1.0;
+                ManualRatioX = avgRatioX;
+                ManualRatioY = avgRatioY;
+                
                 // Populate display points
                 CalibrationPoints.Clear();
                 foreach (var point in settings.MouseCalibration.PointsX)
@@ -479,6 +496,8 @@ public partial class DebugViewModel : ObservableObject
                 HasCalibrationData = false;
                 CalibrationStatus = "尚未校準";
                 CalibrationFormula = "";
+                ManualRatioX = 1.0;
+                ManualRatioY = 1.0;
             }
         }
         catch (Exception ex)
@@ -657,6 +676,59 @@ public partial class DebugViewModel : ObservableObject
     }
 
     private bool CanClearCalibration() => !IsCalibrating && HasCalibrationData;
+
+    [RelayCommand(CanExecute = nameof(CanSaveManualCalibration))]
+    private async Task SaveManualCalibrationAsync()
+    {
+        try
+        {
+            // Create calibration data from manual ratios
+            // We'll create a simple two-point calibration: one at 0 and one at a reference point
+            var calibrationData = new MouseCalibrationData
+            {
+                CalibratedAt = DateTime.Now,
+                PointsX = new List<CalibrationPoint>
+                {
+                    new CalibrationPoint { HidDelta = 0, ActualPixelDelta = 0 },
+                    new CalibrationPoint { HidDelta = 100, ActualPixelDelta = 100 * ManualRatioX }
+                },
+                PointsY = new List<CalibrationPoint>
+                {
+                    new CalibrationPoint { HidDelta = 0, ActualPixelDelta = 0 },
+                    new CalibrationPoint { HidDelta = 100, ActualPixelDelta = 100 * ManualRatioY }
+                }
+            };
+
+            var settings = await _settingsService.LoadAsync();
+            settings.MouseCalibration = calibrationData;
+            await _settingsService.SaveAsync(settings);
+
+            // Update UI
+            HasCalibrationData = true;
+            LastCalibrationTime = calibrationData.CalibratedAt.ToString("yyyy-MM-dd HH:mm:ss") + " (手動)";
+            CalibrationStatus = $"手動設定 - X: {ManualRatioX:F3}, Y: {ManualRatioY:F3}";
+            CalibrationFormula = $"Pixel_X = HID_ΔX × {ManualRatioX:F3}\nPixel_Y = HID_ΔY × {ManualRatioY:F3}\n(手動設定線性比例)";
+            
+            // Update display points
+            CalibrationPoints.Clear();
+            CalibrationPoints.Add(new CalibrationPointDisplay { HidDelta = 100, ActualPixelDelta = 100 * ManualRatioX, Axis = "X" });
+            CalibrationPoints.Add(new CalibrationPointDisplay { HidDelta = 100, ActualPixelDelta = 100 * ManualRatioY, Axis = "Y" });
+
+            StatusMessage = "手動校準數據已保存";
+            await _loggingService.LogInfoAsync("Manual mouse calibration saved", new Dictionary<string, object>
+            {
+                { "RatioX", ManualRatioX },
+                { "RatioY", ManualRatioY }
+            });
+        }
+        catch (Exception ex)
+        {
+            StatusMessage = $"保存手動校準失敗：{ex.Message}";
+            await _loggingService.LogErrorAsync("Failed to save manual calibration", ex);
+        }
+    }
+
+    private bool CanSaveManualCalibration() => !IsCalibrating && ManualRatioX > 0 && ManualRatioY > 0;
 
     private async Task RunCalibrationAsync(CancellationToken cancellationToken)
     {
