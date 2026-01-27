@@ -29,6 +29,12 @@ public class RecordingService : IRecordingService
     private HotkeyDefinition? _ignoreStart;
     private HotkeyDefinition? _ignorePause;
     private HotkeyDefinition? _ignoreStop;
+    
+    /// <summary>
+    /// Tracks keys that are currently pressed to filter out key repeat events.
+    /// When a key is held down, Windows sends repeated key down events which should be ignored.
+    /// </summary>
+    private readonly HashSet<VirtualKey> _pressedKeys = new();
 
     /// <summary>
     /// Initializes a new instance of the RecordingService class.
@@ -161,6 +167,7 @@ public class RecordingService : IRecordingService
                 _lastEventTime = DateTime.UtcNow;
                 _lastMousePosition = initialMousePosition;
                 _isFirstEventInSegment = true;
+                _pressedKeys.Clear();
             }
 
             // Install hooks for mouse and keyboard events
@@ -295,6 +302,28 @@ public class RecordingService : IRecordingService
 
             if (!session.Options.RecordKeyboardInput)
                 return;
+            
+            // Filter out key repeat events:
+            // - If key down and key is already pressed, this is a repeat event - ignore
+            // - If key up and key is not in pressed set, ignore (key was pressed before recording started)
+            if (isDown)
+            {
+                if (_pressedKeys.Contains(key))
+                {
+                    // Key repeat event - ignore
+                    return;
+                }
+                _pressedKeys.Add(key);
+            }
+            else
+            {
+                if (!_pressedKeys.Contains(key))
+                {
+                    // Key was not tracked as pressed - ignore
+                    return;
+                }
+                _pressedKeys.Remove(key);
+            }
         }
 
         try
