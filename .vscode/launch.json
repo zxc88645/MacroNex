@@ -1,0 +1,16 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": ".NET Core Launch (MacroNex.Presentation)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-dev",
+      "program": "${workspaceFolder}\\src\\MacroNex.Presentation\\bin\\Debug\\net10.0-windows\\MacroNex.Presentation.dll",
+      "args": [],
+      "cwd": "${workspaceFolder}\\src\\MacroNex.Presentation",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    }
+  ]
+}
