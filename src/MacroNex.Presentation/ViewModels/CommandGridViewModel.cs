@@ -1,4 +1,4 @@
-﻿using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ICSharpCode.AvalonEdit.Document;
 using ICSharpCode.AvalonEdit.Highlighting;
@@ -12,6 +12,7 @@ using MoonSharp.Interpreter;
 using LuaScript = MoonSharp.Interpreter.Script;
 using Script = MacroNex.Domain.Entities.Script;
 using System.Windows.Threading;
+using System.Text.RegularExpressions;
 using Point = MacroNex.Domain.ValueObjects.Point;
 
 namespace MacroNex.Presentation.ViewModels;
@@ -21,6 +22,7 @@ namespace MacroNex.Presentation.ViewModels;
 /// </summary>
 public partial class CommandGridViewModel : ObservableObject
 {
+    private const int HiddenPreludeLineOffset = 0;
     private readonly IScriptManager _scriptManager;
     private readonly ILoggingService _loggingService;
     private readonly IInputSimulator _inputSimulator;
@@ -28,6 +30,7 @@ public partial class CommandGridViewModel : ObservableObject
     private string _originalScriptText = string.Empty;
     private readonly DispatcherTimer _autoSaveTimer;
     private int _pendingVersion;
+    private string? _lastLoggedSyntaxDiagnosticKey;
 
     // Updated by the view (AvalonEdit) so we can insert snippets at the caret.
     [ObservableProperty]
@@ -422,61 +425,96 @@ public partial class CommandGridViewModel : ObservableObject
             var lua = new LuaScript(CoreModules.Basic | CoreModules.String | CoreModules.Table | CoreModules.Math);
             lua.LoadString(code);
             SetDiagnostic(null, 0, 0);
+            _lastLoggedSyntaxDiagnosticKey = null;
         }
         catch (SyntaxErrorException ex)
         {
-            var (line, col) = TryParseLineCol(ex.DecoratedMessage);
-            SetDiagnostic(ex.DecoratedMessage, line, col);
+            // MoonSharp 在 DecoratedMessage 中會帶 chunk_0:(line,start-end) 這種格式，
+            // 這裡只解析第一個位置（MoonSharp 只回報第一個語法錯誤）。
+            var (rawLine, rawCol) = TryParseLineCol(ex.DecoratedMessage);
+            SetDiagnostic(ex.DecoratedMessage, rawLine, rawCol);
+
+            // 也寫入下方紀錄區塊（去重避免每次 debounce 都刷一筆）。
+            await LogSyntaxDiagnosticAsync(ex.DecoratedMessage, rawLine, rawCol);
         }
         catch (Exception ex)
         {
             SetDiagnostic(ex.Message, 0, 0);
+            await LogSyntaxDiagnosticAsync(ex.Message, 0, 0);
         }
 
         await Task.CompletedTask;
     }
 
-    private void SetDiagnostic(string? message, int line, int column)
+    private async Task LogSyntaxDiagnosticAsync(string? message, int rawLine, int rawCol)
     {
-        // If we have a message but no location, mark line 1 so UI still shows a highlight.
+        if (string.IsNullOrWhiteSpace(message))
+            return;
+
+        // Normalize a stable key so the same diagnostic doesn't spam the log on every debounce tick.
+        var msgNorm = message.Replace("\r\n", "\n").Trim();
+
+        // key 使用原始行列，避免 HiddenPreludeLineOffset 改變時造成重複寫入
+        var key = $"{rawLine}:{rawCol}:{msgNorm}";
+        if (string.Equals(_lastLoggedSyntaxDiagnosticKey, key, StringComparison.Ordinal))
+            return;
+
+        _lastLoggedSyntaxDiagnosticKey = key;
+
+        var (line, col) = ApplyHiddenLineOffset(rawLine, rawCol);
+
+        var ctx = new Dictionary<string, object>
+        {
+            { "DiagnosticLine", line },
+            { "DiagnosticColumn", col },
+        };
+
+        if (CurrentScript != null)
+        {
+            ctx["ScriptId"] = CurrentScript.Id;
+            ctx["ScriptName"] = CurrentScript.Name;
+        }
+
+        // Put the human-readable location into the message too (UI list shows Message prominently).
+        var where = line > 0 ? $"(line {line}, col {Math.Max(1, col)})" : "(unknown location)";
+        await _loggingService.LogWarningAsync($"Syntax error {where}: {msgNorm}", ctx);
+    }
+
+    private (int line, int col) ApplyHiddenLineOffset(int rawLine, int rawCol)
+    {
+        if (rawLine <= 0)
+            return (rawLine, rawCol);
+
+        var adjusted = rawLine - HiddenPreludeLineOffset;
+        return (adjusted <= 0) ? (0, rawCol) : (adjusted, rawCol);
+    }
+
+    private void SetDiagnostic(string? message, int rawLine, int rawColumn)
+    {
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            DiagnosticMessage = null;
+            DiagnosticLine = 0;
+            DiagnosticColumn = 0;
+            HasDiagnostic = false;
+            DiagnosticsChanged?.Invoke(this, EventArgs.Empty);
+            return;
+        }
+
+        var (line, col) = ApplyHiddenLineOffset(rawLine, rawColumn);
+
+        // 如果有訊息但是沒有合法行號，至少高亮第 1 行，讓使用者知道有錯。
         if (!string.IsNullOrWhiteSpace(message) && line <= 0)
         {
             line = 1;
-            column = 1;
+            col = 1;
         }
 
         DiagnosticMessage = message;
         DiagnosticLine = line;
-        DiagnosticColumn = column;
+        DiagnosticColumn = col;
         HasDiagnostic = !string.IsNullOrWhiteSpace(message);
         DiagnosticsChanged?.Invoke(this, EventArgs.Empty);
-    }
-
-    private static (int line, int col) TryParseLineCol(string? msg)
-    {
-        if (string.IsNullOrEmpty(msg))
-            return (0, 0);
-
-        var lineIdx = msg.IndexOf("line ", StringComparison.OrdinalIgnoreCase);
-        if (lineIdx >= 0)
-        {
-            var after = msg[(lineIdx + 5)..];
-            var parts = after.Split(new[] { ' ', '\r', '\n', '\t', ',', ')' }, StringSplitOptions.RemoveEmptyEntries);
-            if (parts.Length > 0 && int.TryParse(parts[0], out var line))
-            {
-                var colIdx = msg.IndexOf("col ", StringComparison.OrdinalIgnoreCase);
-                if (colIdx >= 0)
-                {
-                    var afterCol = msg[(colIdx + 4)..];
-                    var colParts = afterCol.Split(new[] { ' ', '\r', '\n', '\t', ',', ')' }, StringSplitOptions.RemoveEmptyEntries);
-                    if (colParts.Length > 0 && int.TryParse(colParts[0], out var col))
-                        return (line, col);
-                }
-                return (line, 1);
-            }
-        }
-
-        return (0, 0);
     }
 
     private void RemoveLastNonEmptyLine()
@@ -498,6 +536,25 @@ public partial class CommandGridViewModel : ObservableObject
         _isUpdatingDocument = true;
         Document.Text = string.Join(Environment.NewLine, lines);
         _isUpdatingDocument = false;
+    }
+
+    private static (int line, int col) TryParseLineCol(string? msg)
+    {
+        if (string.IsNullOrEmpty(msg))
+            return (0, 0);
+
+        // 目前觀察到的格式為：chunk_0:(10,0-6): unexpected symbol near 'msleep'
+        // 只解析第一個 "(line,start-end)"，其他情況保持 (0,0) 交給 SetDiagnostic 做保底。
+        var m = Regex.Match(msg, @"\(\s*(\d+)\s*,\s*(\d+)\s*-\s*(\d+)\s*\)");
+        if (m.Success && int.TryParse(m.Groups[1].Value, out var line))
+        {
+            var col = 1;
+            if (int.TryParse(m.Groups[2].Value, out var startCol) && startCol >= 0)
+                col = startCol + 1; // 0-based -> 1-based
+            return (line, col);
+        }
+
+        return (0, 0);
     }
 }
 
