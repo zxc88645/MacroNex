@@ -10,27 +10,31 @@ The application follows hexagonal (ports and adapters) architecture with clear s
 
 ```
 MacroNex/
-?œâ??€ src/
-??  ?œâ??€ MacroNex.Domain/           # Core business logic and entities
-??  ??  ?œâ??€ Entities/                 # Domain entities (Script, Command hierarchy)
-??  ??  ?œâ??€ ValueObjects/             # Value objects (Point, MouseButton, etc.)
-??  ??  ?œâ??€ Interfaces/               # Domain interfaces (ports)
-??  ??  ?”â??€ Events/                   # Domain events
-??  ????  ?œâ??€ MacroNex.Application/      # Application services and use cases
-??  ??  ?œâ??€ Services/                 # Application services
-??  ??  ?œâ??€ UseCases/                 # Business workflows
-??  ??  ?”â??€ DTOs/                     # Data transfer objects
-??  ????  ?œâ??€ MacroNex.Infrastructure/   # External adapters
-??  ??  ?œâ??€ Adapters/                 # Concrete implementations
-??  ??  ?œâ??€ Win32/                    # Win32 API integration
-??  ??  ?”â??€ Storage/                  # File system and JSON serialization
-??  ????  ?”â??€ MacroNex.Presentation/     # WPF UI layer
-??      ?œâ??€ ViewModels/               # MVVM ViewModels
-??      ?œâ??€ Views/                    # WPF Views and UserControls
-??      ?œâ??€ Converters/               # Value converters
-??      ?”â??€ Extensions/               # Service registration extensions
-???”â??€ tests/
-    ?”â??€ MacroNex.Tests/            # Unit and property-based tests
+â”œâ”€â”€ src/
+â”‚   â”œâ”€â”€ MacroNex.Domain/           # Core business logic and entities
+â”‚   â”‚   â”œâ”€â”€ Entities/              # Domain entities (Script, Command hierarchy)
+â”‚   â”‚   â”œâ”€â”€ ValueObjects/          # Value objects (Point, MouseButton, etc.)
+â”‚   â”‚   â”œâ”€â”€ Interfaces/            # Domain interfaces (ports)
+â”‚   â”‚   â””â”€â”€ Events/                # Domain events
+â”‚   â”‚
+â”‚   â”œâ”€â”€ MacroNex.Application/      # Application services and use cases
+â”‚   â”‚   â”œâ”€â”€ Services/              # Application services
+â”‚   â”‚   â”œâ”€â”€ UseCases/              # Business workflows
+â”‚   â”‚   â””â”€â”€ DTOs/                  # Data transfer objects
+â”‚   â”‚
+â”‚   â”œâ”€â”€ MacroNex.Infrastructure/   # External adapters
+â”‚   â”‚   â”œâ”€â”€ Adapters/              # Concrete implementations
+â”‚   â”‚   â”œâ”€â”€ Win32/                 # Win32 API integration
+â”‚   â”‚   â””â”€â”€ Storage/               # File system and JSON serialization
+â”‚   â”‚
+â”‚   â””â”€â”€ MacroNex.Presentation/     # WPF UI layer
+â”‚       â”œâ”€â”€ ViewModels/            # MVVM ViewModels
+â”‚       â”œâ”€â”€ Views/                 # WPF Views and UserControls
+â”‚       â”œâ”€â”€ Converters/            # Value converters
+â”‚       â””â”€â”€ Extensions/            # Service registration extensions
+â”‚
+â””â”€â”€ tests/
+    â””â”€â”€ MacroNex.Tests/            # Unit and property-based tests
 ```
 
 ### Technology Stack
@@ -100,20 +104,20 @@ dotnet run --project src/MacroNex.Presentation
 
 | Script | Mode | Speed | Use Case |
 |--------|------|-------|----------|
-| `build-dev.bat` | Debug | ??Fastest | Daily development |
-| `run-dev.bat` | Debug | ??Fastest | Quick testing |
-| `build-release.bat` | Release | ?¡âš¡ Fast | Testing optimized builds |
-| `publish-macronex.bat` | Release + Package | ?¡âš¡??Slowest | Final distribution |
+| `build-dev.bat` | Debug | Fastest | Daily development |
+| `run-dev.bat` | Debug | Fastest | Quick testing |
+| `build-release.bat` | Release | Fast | Testing optimized builds |
+| `publish-macronex.bat` | Release + Package | Slowest | Final distribution |
 
 ### Project Dependencies
 
 The dependency flow follows hexagonal architecture principles:
 
 ```
-Presentation ??Application ??Domain
-Infrastructure ??Domain
-Infrastructure ??Application (for concrete implementations)
-Tests ??All layers (for comprehensive testing)
+Presentation -> Application -> Domain
+Infrastructure -> Domain
+Infrastructure -> Application (for concrete implementations)
+Tests -> All layers (for comprehensive testing)
 ```
 
 ## Development Guidelines
