@@ -2,13 +2,17 @@
   "version": "0.2.0",
   "configurations": [
     {
-      "name": ".NET Core Launch (MacroNex.Presentation)",
+      "name": ".NET Core Launch (MacroNex.Presentation - Watch)",
       "type": "coreclr",
       "request": "launch",
-      "preLaunchTask": "build-dev",
-      "program": "${workspaceFolder}\\src\\MacroNex.Presentation\\bin\\Debug\\net10.0-windows\\MacroNex.Presentation.dll",
-      "args": [],
-      "cwd": "${workspaceFolder}\\src\\MacroNex.Presentation",
+      "program": "dotnet",
+      "args": [
+        "watch",
+        "--project",
+        "${workspaceFolder}\\src\\MacroNex.Presentation\\MacroNex.Presentation.csproj",
+        "run"
+      ],
+      "cwd": "${workspaceFolder}",
       "console": "internalConsole",
       "stopAtEntry": false
     }
